@@ -12,7 +12,7 @@ import { Plus, RefreshCw, LayoutList, LayoutGrid, Search, X } from 'lucide-react
 export default function BoardDetail() {
   const { slug } = useParams()
   const { user, permissions } = useAuth()
-  const { enable_nsfw_boards, block_nsfw_without_age_gate } = useSiteSettings()
+  const { enable_nsfw_boards, block_nsfw_without_age_gate, allow_image_uploads, allow_video_uploads } = useSiteSettings()
   const [threads, setThreads] = useState([])
   const [board, setBoard] = useState(null)
   const [gateNeeded, setGateNeeded] = useState(false)
@@ -265,7 +265,7 @@ export default function BoardDetail() {
           )}
           {error && <div className="error-msg">{error}</div>}
           <div className="form-actions">
-            {board?.allow_images && (
+            {board?.allow_images && (allow_image_uploads || user?.can_post_media) && (
               <label className="btn-ghost image-upload-label" title="Attach image">
                 🖼 Image
                 <input
@@ -276,7 +276,7 @@ export default function BoardDetail() {
                 />
               </label>
             )}
-            {board?.allow_videos && (
+            {board?.allow_videos && (allow_video_uploads || user?.can_post_media) && (
               <label className="btn-ghost image-upload-label" title="Attach video (MP4/WebM)">
                 🎬 Video
                 <input

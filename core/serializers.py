@@ -84,8 +84,8 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'display_name', 'avatar', 'bio', 'tagline', 'display_badge',
-                  'post_count', 'is_premium', 'communities_created', 'created_at']
-        read_only_fields = ['username', 'post_count', 'created_at']
+                  'post_count', 'is_premium', 'communities_created', 'created_at', 'can_post_media']
+        read_only_fields = ['username', 'post_count', 'created_at', 'can_post_media']
 
     def get_communities_created(self, obj):
         from .models import Community

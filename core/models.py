@@ -136,6 +136,17 @@ class User(AbstractUser):
         help_text='AP Actor URL for remote stub users. Null for local accounts.'
     )
 
+    # Media posting grant — operator-only toggle.
+    # When site-wide image/video uploads are disabled, users with this flag
+    # set can still attach media. Has no effect when uploads are globally on
+    # (everyone can post media in that case anyway).
+    can_post_media = models.BooleanField(
+        default=False,
+        help_text='Allow this user to attach images and videos even when site-wide '
+                  'media uploads are disabled. Set by an operator; has no effect '
+                  'when uploads are globally enabled.'
+    )
+
     REQUIRED_FIELDS = []
 
     def __str__(self):

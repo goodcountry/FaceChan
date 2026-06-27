@@ -683,9 +683,13 @@ class ThreadViewSet(viewsets.ModelViewSet):
         # Process image upload if present — validate BEFORE saving the thread
         # so a rejected image doesn't leave an orphaned thread behind
         image_file = self.request.FILES.get('image')
+        user_may_post_media = settings.allow_image_uploads or self.request.user.can_post_media
         if image_file and not board.allow_images:
             from rest_framework.exceptions import ValidationError
             raise ValidationError({'image': 'This board does not allow image uploads.'})
+        if image_file and not user_may_post_media:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'image': 'Image uploads are disabled on this instance.'})
         processed = None
         if image_file:
             max_bytes = settings.max_image_size_mb * 1024 * 1024
@@ -709,6 +713,7 @@ class ThreadViewSet(viewsets.ModelViewSet):
             processed.seek(0)
 
         # Process video upload if present — mutually exclusive with image
+        user_may_post_video = settings.allow_video_uploads or self.request.user.can_post_media
         video_file = self.request.FILES.get('video')
         if video_file and image_file:
             from rest_framework.exceptions import ValidationError
@@ -716,7 +721,7 @@ class ThreadViewSet(viewsets.ModelViewSet):
         if video_file and not board.allow_videos:
             from rest_framework.exceptions import ValidationError
             raise ValidationError({'video': 'This board does not allow video uploads.'})
-        if video_file and not settings.allow_video_uploads:
+        if video_file and not user_may_post_video:
             from rest_framework.exceptions import ValidationError
             raise ValidationError({'video': 'Video uploads are disabled on this instance.'})
         processed_video = None
@@ -929,9 +934,13 @@ class PostViewSet(viewsets.ModelViewSet):
         # Validate image BEFORE saving the post so a rejected image
         # doesn't leave an orphaned post behind
         image_file = self.request.FILES.get('image')
+        user_may_post_media = settings.allow_image_uploads or self.request.user.can_post_media
         if image_file and not thread.board.allow_images:
             from rest_framework.exceptions import ValidationError
             raise ValidationError({'image': 'This board does not allow image uploads.'})
+        if image_file and not user_may_post_media:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'image': 'Image uploads are disabled on this instance.'})
         processed = None
         if image_file:
             max_bytes = settings.max_image_size_mb * 1024 * 1024
@@ -956,6 +965,7 @@ class PostViewSet(viewsets.ModelViewSet):
             processed.seek(0)
 
         # Process video upload if present — mutually exclusive with image
+        user_may_post_video = settings.allow_video_uploads or self.request.user.can_post_media
         video_file = self.request.FILES.get('video')
         if video_file and image_file:
             from rest_framework.exceptions import ValidationError
@@ -963,7 +973,7 @@ class PostViewSet(viewsets.ModelViewSet):
         if video_file and not thread.board.allow_videos:
             from rest_framework.exceptions import ValidationError
             raise ValidationError({'video': 'This board does not allow video uploads.'})
-        if video_file and not settings.allow_video_uploads:
+        if video_file and not user_may_post_video:
             from rest_framework.exceptions import ValidationError
             raise ValidationError({'video': 'Video uploads are disabled on this instance.'})
         processed_video = None

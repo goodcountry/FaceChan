@@ -407,6 +407,7 @@ function Comment({ post, threadId, onReact, onNewReply, allowImages = true, allo
 export default function ThreadDetail() {
   const { id } = useParams()
   const { user, permissions } = useAuth()
+  const { allow_image_uploads, allow_video_uploads } = useSiteSettings()
   const { refresh: refreshBell } = useNotifications()
   const [thread, setThread] = useState(null)
   const [posts, setPosts] = useState([])
@@ -590,8 +591,8 @@ export default function ThreadDetail() {
           onPosted={handleNewPost}
           placeholder="Write a comment…"
           showSage={true}
-          allowImages={thread.allow_images !== false}
-          allowVideos={thread.allow_videos !== false}
+          allowImages={thread.allow_images !== false && (allow_image_uploads || !!user?.can_post_media)}
+          allowVideos={thread.allow_videos !== false && (allow_video_uploads || !!user?.can_post_media)}
         />
       )}
       {thread.is_locked && <p className="muted text-center">🔒 This thread is locked — post limit reached.</p>}
@@ -609,8 +610,8 @@ export default function ThreadDetail() {
             threadId={id}
             onReact={handleReact}
             onNewReply={() => setThread(t => ({ ...t, reply_count: t.reply_count + 1 }))}
-            allowImages={thread.allow_images !== false}
-            allowVideos={thread.allow_videos !== false}
+            allowImages={thread.allow_images !== false && (allow_image_uploads || !!user?.can_post_media)}
+            allowVideos={thread.allow_videos !== false && (allow_video_uploads || !!user?.can_post_media)}
             allowVideoSound={thread.allow_video_sound !== false}
             commentsDisabled={!!thread.comments_disabled}
             isNew={p.id === newPostId}
