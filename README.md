@@ -19,7 +19,7 @@ MIT licensed. Fork it. Run it. Make it yours.
 - **Community discovery** — trending, active, newest sort modes; search by name/description
 - **Community invite links** — tokenised links with optional expiry and max-uses for private communities
 - **Board-scoped thread search** — search threads by title and body within any board
-- **Image uploads** — WebP conversion, EXIF stripping, auto-resize; per-board image toggle for text-only boards
+- **Image uploads** — WebP conversion, EXIF stripping, auto-resize; per-board image toggle for text-only boards; per-user media grant for when uploads are globally off
 - **Video uploads** — short MP4/WebM clips; FFmpeg re-encode + metadata strip; per-board video and sound toggles; duration cap; thumbnail from first frame; CSAM checkpoint on first frame
 - **Avatar uploads** — operator toggle; 512KB default cap; EXIF strip + square crop; CSAM checkpoint
 - **Markdown rendering** — posts and thread OPs render bold, italic, headings, blockquotes, code, links, lists; operator toggle; thread card preview strips markdown to plain text
@@ -98,6 +98,7 @@ docker compose exec web python manage.py grant_admin <username>
 - **NSFW** board toggle — NSFW boards are hidden from all logged-out users; login and age confirmation both required to see or access them
 - **Image / video upload** limits
 - **Allow avatars** — off by default; `max_avatar_size_kb` caps upload size (default 512KB)
+- **Per-user media grant** — `User.can_post_media`; operator-only toggle in Django admin; lets a specific user attach images and videos even when uploads are globally disabled
 - **Allow markdown** — on by default; off renders all post bodies as plain text
 - **Allow post editing** — off by default; `post_edit_window_seconds` sets how long users have (default 90s, 0 = unlimited)
 - **Federation enabled** — master switch for ActivityPub federation

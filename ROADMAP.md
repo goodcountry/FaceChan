@@ -132,6 +132,7 @@ Self-hosted Plausible or Umami — no cookies, no fingerprinting, Tor-compatible
 - **Post/thread rate limits** — rolling 24h window, 0 = unlimited
 - **Registration enforcement** — `SiteSettings.registration_open` toggle
 - **Per-board image toggle** — `Board.allow_images`; text-only boards enforced at API and UI
+- **Per-user media grant** — `User.can_post_media`; operator-only Django admin toggle; allows a specific user to attach images and videos when uploads are globally disabled; attach buttons hidden in UI for users without the grant
 - **Username change audit + cooldown**
 - **CSAM detection scaffolding** — mandatory checkpoint on images and video first frames, no off switch; pHash stored unconditionally; honest stub with full operator checklist
 - **COMPLIANCE.md** — operator-responsibility doc, universal floor vs jurisdictional layer, three-tier content removal, IP logging data protection note
