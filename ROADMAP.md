@@ -1,0 +1,169 @@
+# FaceChan Roadmap
+
+Features and tweaks planned, roughly in priority order. Nothing here is a promise — this is a living document.
+
+PRs welcome on any of these.
+
+---
+
+## 🔴 High Priority
+
+_Nothing currently blocking release._
+
+---
+
+## 🟡 Medium Priority
+
+### Internationalisation (i18n)
+
+FaceChan is built for a global audience. UI translation is on the roadmap.
+
+**Current state:** The codebase is English-only. Tech-savvy operators can edit strings directly. `LANGUAGES.md` in the repo root signals intent and welcomes community translation contributions.
+
+**Planned work:**
+- Django i18n middleware (`USE_I18N=True`, `LocaleMiddleware`)
+- Extract all frontend strings into `i18next` translation files (`en.json` as the base)
+- Language detection from browser `Accept-Language` header with user override
+- Contributed translation files live under `frontend/src/locales/`
+- No auto-translation — human-contributed only
+
+**Not in scope for v1.** PRs with translation files for additional languages are welcomed ahead of the implementation being complete — they will be merged and held ready.
+
+---
+
+### Board subscriptions and personalised board view
+
+Users can subscribe to specific boards, creating a personal "My Boards" view that shows only their chosen boards. The full board list remains accessible at all times to discover new boards and add them to the subscription.
+
+**Design notes:**
+- `BoardSubscription` model — user FK + board FK, unique together
+- Subscriptions stored per user; no operator involvement needed
+- Board list page gains a toggle: **All Boards** / **My Boards**; defaults to My Boards if the user has any subscriptions; falls back to All Boards if none set
+- Subscribe/unsubscribe button on each board card and on the board header
+- Feed view — if a user has subscriptions, the feed shows threads only from subscribed boards; if no subscriptions, current behaviour (all boards) is preserved
+- Anonymous users always see all boards
+
+### Content filtering and blocking
+
+Per-user client-side and server-side filtering to reduce unwanted content. Privacy-preserving — filters are stored server-side against the user account but never shared or inspected by operators.
+
+**What should be blockable:**
+- **By board** — hide all threads from a specific board (equivalent to unsubscribing, but for boards you don't want to see even in the full list)
+- **By display name** — hide all posts and threads from a specific display name; since display names aren't unique this is fuzzy, but sufficient for most cases; stable username blocking is a stricter alternative for known accounts
+- **By keyword/phrase** — hide threads where the title or body matches a keyword or phrase; case-insensitive substring match; optional regex for power users
+- **Subject line filter** — same as keyword but title-only; lower false positive rate
+
+**Design notes:**
+- `UserFilter` model — user FK, filter type (board/display_name/keyword/title_keyword), value string, created_at
+- Filters applied at API level on thread list and feed endpoints — filtered threads simply don't appear, no indication to the filtered user that content exists
+- Frontend filter management page at `/settings/filters` or as a section of the profile page
+- No limit on number of filters per user (within reason — 500 cap prevents abuse)
+- Filters apply to federated content too — a keyword filter works regardless of which instance a thread originated from
+
+### Mixed clearnet/onion federation testing
+
+Onion-to-onion federation is proven working. Clearnet-to-clearnet is untested but should work. **Clearnet-to-onion and onion-to-clearnet mixed-mode federation is untested** — the transport routing logic exists and should handle it, but HTTP signature verification across the mixed round-trip is an unknown. Needs a real test between a Railway/VPS clearnet instance and a Tor hidden service instance. See DEPLOYMENT.md for the full picture of what's known and unknown.
+
+### Search enhancements
+Current search is board-scoped thread search (title + body). Future: full-text search across posts within a thread, and optionally a global search across boards.
+
+### Community enhancements
+- Community banner image upload (on hold — not needed to ship)
+
+---
+
+## 🟢 Lower Priority / Nice to Have
+
+### Lightning Network donations
+BTC and Monero addresses are in `DONATE.md`. Lightning needs a static address — options are Wallet of Satoshi (no KYC, custodial) or self-hosted LNbits/BTCPay Server. Deferred until server infrastructure is in place.
+
+### Analytics (privacy-preserving)
+Self-hosted Plausible or Umami — no cookies, no fingerprinting, Tor-compatible.
+
+### Onion-specific hardening
+- No-JS fallback view for Tor Browser users with JS disabled
+
+### Mod tools
+- Standalone user search for staff — deliberately skipped for now. Community feedback will decide. The report queue already surfaces usernames. An open search-by-username endpoint raises privacy questions that cut against the anonymous-first ethos.
+
+---
+
+## ✅ Done
+
+- **Site pages** — `SitePage` model (slug, title, markdown content, published, show_in_footer, display_order); Rules and FAQ seeded automatically; `can_manage_pages` role flag; **Mod → Pages** frontend editor with live preview; `GET /api/pages/` and `GET /api/pages/:slug/` public endpoints; `PATCH /api/pages/:slug/edit/` staff endpoint; pages linked automatically in site footer
+- **Site footer** — dynamic footer links to published pages; Transparency link; MIT licence line; scroll-to-footer `↓` button in navbar next to theme toggle
+- **Autocomplete fixes** — correct `autoComplete` attributes on login, register, and profile inputs; prevents browser autofilling strapline into username field
+- **Avatar uploads** — operator toggle (`allow_avatars`, default off); `max_avatar_size_kb` cap (default 512KB); EXIF strip + square crop; CSAM checkpoint; camera icon overlay on profile
+- **Markdown rendering** — regex-based parser (no external dependency); bold, italic, headings, blockquotes (accent-coloured left border), code blocks, links, lists, HR; operator toggle (`allow_markdown`, default on); thread card preview strips markdown to plain text; `utils/markdown.js` shared utility
+- **Post editing** — `allow_post_editing` toggle (default off); `post_edit_window_seconds` (default 90, 0 = unlimited); live countdown timer in edit UI, restarts on keystroke; `edited_at` + `edit_count` fields on `Post`; "edited" badge shown on modified posts; staff follow same rules as everyone else
+- **Login name vs display name** — `username` is stable private login credential; `display_name` shown everywhere (default = username at registration); duplicate display names allowed; `DisplayNameChangeLog` audit trail; 14-day cooldown; AP Actor `name` field uses display name, `preferredUsername` uses stable username
+- **Bot protection** — honeypot `website` field on registration, thread creation, and reply forms (silent 200 on trigger); optional self-hosted mCaptcha via `MCAPTCHA_URL` + `MCAPTCHA_SITE_KEY` env vars (Tor-compatible, no third parties)
+- **Communities toggle** — `enable_communities` in SiteSettings; hides nav link, returns 403 on creation; existing communities unaffected; enables blog-style single-operator deployments
+- **Solarized light mode** — `[data-theme="light"]` CSS variable overrides; sun/moon toggle in navbar; preference persisted to `localStorage`; `prefers-color-scheme` respected as default; no flash on load via inline `<script>` in `index.html`
+- **Outbound follow-state tracking** — `RemoteBoardMapping.follow_accepted` (nullable bool); set to `False` when Follow is queued, `True` when Accept arrives; federation dashboard shows ✓ Following / ⏳ Pending badge per board mapping
+- **Reply federation live** — verified end-to-end: replies on remote threads deliver via `inReplyTo`, filed under the correct local thread, appear without refresh
+- **Instance directory** — `INSTANCES.md` in the repo; operator self-submission via PR; content policy flags, federation status; disclaimer that Kino doesn't endorse any listed instance
+- **Auto-create prune periodic task** — data migration creates the Celery Beat task on first run; no manual admin step needed
+- **Mobile UX** — board header actions wrap to second row on small screens; compact reaction bar (active reactions + tap-to-open picker); NSFW boards hidden from board list for logged-out/unverified users
+- **Profile editing** — strapline and bio editable from profile page; avatar shown on posts and replies; tagline shown below author name on posts
+- **Password change** — `POST /api/me/password/` validates current password, reissues token; UI on profile page
+- **Scroll to new post** — after replying to a thread OP, page smooth-scrolls to the new post
+- **Seed boards** — 11 boards with readable slugs and 25 hand-written thread titles each; `/random` marked NSFW by default; no founder account in seed data
+- Django REST Framework backend — boards, threads, posts, communities, reactions, feed
+- React 18 + Vite frontend
+- Token-based authentication (register, login)
+- Community roles (member, mod, admin) with full join/leave/role management
+- Sage posting, post quoting/threading, emoji reactions
+- Personalised feed (community-weighted, private community gating)
+- `SiteSettings` singleton — full admin control with no code changes
+- User badges (`display_badge`: founder/mod/premium), tagline field
+- Image uploads — WebP conversion, EXIF stripping, 2048px resize
+- Docker Compose dev stack (single command, auto-seed on fresh DB)
+- Docker Compose prod stack (Daphne + Postgres + Redis + Celery + Nginx + Tor)
+- Dev compose healthcheck — nginx waits for Django to be healthy before accepting connections
+- Nginx lazy DNS resolution, CSRF trusted origins, `.env.example`
+- Django admin fully configured for all models
+- **Compliance-by-design** — jurisdiction mode, content reporting, age confirmation, NSFW age-gating, transparency page, moderation contact; all on by default
+- **Moderation system** — data-driven `Role` capability flags; board-scoped staff; ban/suspend revokes tokens immediately; three-tier content removal (hide → quarantine → purge)
+- **Staff frontend** — `/mod` (report queue), `/mod/quarantine`, `/mod/users`; card and MUI DataGrid views (lazy-loaded)
+- **Report audit survives purge** — `Report` snapshots author, board, content, preview, and poster IP at filing time
+- **IP logging** — `poster_ip` on every thread and post; snapshotted into `Report.target_poster_ip`; admin-only
+- **Thread pruning** — oldest non-pinned thread culled when board hits `max_threads_per_board`
+- **Post/thread rate limits** — rolling 24h window, 0 = unlimited
+- **Registration enforcement** — `SiteSettings.registration_open` toggle
+- **Per-board image toggle** — `Board.allow_images`; text-only boards enforced at API and UI
+- **Username change audit + cooldown**
+- **CSAM detection scaffolding** — mandatory checkpoint on images and video first frames, no off switch; pHash stored unconditionally; honest stub with full operator checklist
+- **COMPLIANCE.md** — operator-responsibility doc, universal floor vs jurisdictional layer, three-tier content removal, IP logging data protection note
+- **docs/risk-assessment-template.md**
+- **Thread pinning** — `Role.can_pin_threads`; community creators and admins can also pin; pin/unpin on thread card and detail
+- **Comments disabled** — `Thread.comments_disabled`; auto on pin, auto off on unpin; independently toggleable to cool any thread
+- **Community discovery page** — sort by Trending/Active/Popular/Newest; search; activity labels; login redirect with return path
+- **Community invite links** — tokenised URLs with optional expiry and max-uses; admin/mod management panel; public landing page; use count tracked; revocable
+- **Login redirect** — `/login` reads `location.state.from` and returns after auth
+- **Celery + Redis** — task queue and beat scheduler; `django-celery-beat` for DB-driven schedules in Django admin
+- **Community pruning** — `SiteSettings.community_prune_days`; Celery beat task; no exceptions; manual `prune_communities` command
+- **Community activity annotations** — `active_posts` (48h) and `trending_posts` (24h) on community list API
+- **Activity tiers** — operator-configurable; defaults Lurker → Regular → Veteran → Prolific Poster → Legend
+- **Thumbnail generation** — 320×180px WebP, centre-cropped 16:9
+- **Catalog view** — OP thumbnail grid, toggle persisted to localStorage
+- **Watch thread** — bell notifications; Watched tab on Feed with per-thread unread counts
+- **Bump lock** — `SiteSettings.bump_lock_percent` (default 75, max 95); sage never bumps
+- **PWA** — `vite-plugin-pwa` + Workbox; web app manifest; standalone display; 192/512 icons + Apple touch icon; API calls NetworkOnly; SW and manifest no-cache from nginx; installs to home screen on Android and iOS
+- **Responsive navbar** — icons-only on mobile (≤600px); full labels on desktop
+- **Board-scoped thread search** — `?search=` on `/api/threads/?board=` filters title and body; debounced search input in board header with result count and clear button
+- **Duck Roll word filter** — `WordFilter` model; site-wide and per-board scope; plain substring or regex; applied at read time in serializers; raw text always preserved in DB; per-process cache with admin-triggered invalidation; fully managed in Django admin
+- **WebSocket real-time notifications** — Django Channels + Redis channel layer; `NotificationConsumer` per user (`notifications_{user_id}` group); pushed instantly on post create; `NotificationContext` uses WebSocket primary with automatic 60s poll fallback; Daphne replaces Gunicorn as ASGI server; nginx `/ws/` proxy with 24h keepalive
+- **Video uploads** — MP4 and WebM; FFmpeg re-encode strips all metadata; duration cap (default 5 min); size cap (default 50MB); thumbnail from first frame; CSAM pHash on first frame; `Board.allow_videos` and `Board.allow_video_sound` per-board toggles; cascade-off rules enforced at model layer (`allow_images=False` forces both off; `allow_videos=False` forces sound off); `VideoPlayer` component with compact thumbnail mode, hover-to-autoplay, lazy loading
+- **Emergency procedures** — documented shutdown and key destruction steps in `DEPLOYMENT_ONION.md`; covers container teardown, Tor key destruction, log purging, and the limits of software-only wiping on SSDs
+- **DEPLOYMENT.md** — full security hardening guide: LUKS full-disk encryption, VeraCrypt hidden volumes, Tor hardening, firewall rules, SSH hardening, OpSec, data minimisation, legal compulsion guidance, operator checklist
+- **Onion discoverability guide** — Ahmia, Torch, Haystak, DarkSearch, The Hidden Wiki, r/onions; safe promotion via Tor-only; timing discipline; throwaway accounts; promotion checklist added to DEPLOYMENT.md
+- **DONATE.md** — Monero (XMR) and Bitcoin (BTC) addresses with QR codes; Lightning placeholder
+- **Federation Phase 3 — reply federation** — `Post` gains `is_remote`, `remote_ap_id`, `remote_actor_url` fields; `build_reply_note()` builds a `Note` with `inReplyTo`; `deliver_create_reply` Celery task delivers to thread origin board inbox and all followers; inbound handler routes on `inReplyTo` presence, deduplicates, reconciles parent thread by `remote_ap_id` or local UUID, stores as `Post` with stub author
+- **Federation Phase 4 — board WebSocket listener** — `BoardDetail.jsx` opens `ws(s)://host/ws/boards/<slug>/` on mount; prepends incoming `new_thread` events to the thread list without a page refresh; deduplication prevents double-display; cleanup on unmount
+- **Federation Phase 6 — Tor SOCKS outbound** — per-URL transport routing in `fetch.py` (`_client_for`): `.onion` destinations route through a dedicated outbound Tor container (`tor-proxy`, `dperson/torproxy`) via `socks5h://tor-proxy:9050`, clearnet goes direct; `FEDERATION_SOCKS_PROXY` setting; `socksio` dependency; longer timeout for onion circuits; `fetch_instance_boards` task implemented (was referenced but missing); wired into dev test stack and prod compose
+- **Federation — outbound Follow on mapping** — mapping a remote board to a local board sends a `Follow` to the remote board actor (`build_follow_activity`, `deliver_follow` task), so the remote instance begins delivering that board's threads to us; fires on both mapping create and update; remote side auto-accepts via `_handle_follow`; inbound `Accept` is logged as a no-op (outbound follow-state tracking deferred). This is the piece that makes content actually flow after discovery + mapping
+- **Federation foundation** — `federation` Django app; Actor/RemoteInstance/RemoteActor/Follow/FederationActivity models; HTTP Signatures; Webfinger; Board Actor/Inbox/Outbox/Followers + User Actor endpoints; `deliver_accept` + `deliver_create_thread` Celery tasks; post_save signal wiring; anonymous threads stay local; `FEDERATION_BASE_URL` env var
+- **Federation inbound** — `Create(Note)` handler; `RemoteBoardMapping` (operator maps remote slug → local board); stub User accounts for remote authors (`is_remote=True`); `Thread.is_remote` + `remote_ap_id` deduplication; HTML stripping; `BoardConsumer` WebSocket push on inbound thread
+- **Federation dashboard** — `RemoteBoard` cache model; `/ap/instance` public discovery endpoint; `fetch_instance_boards` Celery task (auto-triggered on instance approval); `Board.allow_federation` per-board flag; `SiteSettings.federation_enabled` master switch; full federation management API (admin-only); `FederationDashboard.jsx` at `/mod/federation` — master switch, instance cards, board mapping dropdowns, local board list; Globe nav item in mod sidebar
+- **DEPLOYMENT.md federation section** — clearnet/onion/dual-stack scenarios; `FEDERATION_BASE_URL` explained; instance allowlist workflow; what federates vs stays local; .onion key as federation identity; legal exposure from federated content; instance directory placeholder
