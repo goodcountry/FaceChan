@@ -298,7 +298,7 @@ cp .env.example .env
 docker-compose -f docker-compose.prod.yml -p facechan-prod up -d --build
 
 # 5. Get your onion address
-docker-compose -f docker-compose.prod.yml -p facechan-prod logs tor | grep "Hostname"
+docker-compose -f docker-compose.prod.yml -p facechan-prod logs tor | grep "onion"
 # Or check the hostname file directly:
 docker-compose -f docker-compose.prod.yml -p facechan-prod exec tor cat /var/lib/tor/hidden_service/hostname
 

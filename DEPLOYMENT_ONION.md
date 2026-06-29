@@ -94,7 +94,7 @@ docker compose -f docker-compose.prod.yml -p facechan-prod up -d --build
 Wait 30–60 seconds for Tor to initialise, then:
 
 ```bash
-docker compose -f docker-compose.prod.yml -p facechan-prod logs tor | grep "Hostname"
+docker compose -f docker-compose.prod.yml -p facechan-prod logs tor | grep "onion"
 ```
 
 You will see something like:
