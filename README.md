@@ -23,6 +23,7 @@ MIT licensed. Fork it. Run it. Make it yours.
 - **Video uploads** — short MP4/WebM clips; FFmpeg re-encode + metadata strip; per-board video and sound toggles; duration cap; thumbnail from first frame; CSAM checkpoint on first frame
 - **Avatar uploads** — operator toggle; 512KB default cap; EXIF strip + square crop; CSAM checkpoint
 - **Markdown rendering** — posts and thread OPs render bold, italic, headings, blockquotes, code, links, lists; operator toggle; thread card preview strips markdown to plain text
+- **Hyperlink control** — per-board and global toggle to allow or disallow `http/https` URLs in thread titles, bodies, and replies; off by default; bare domain names always permitted; blocked at write time with a clear error
 - **Site pages** — operator-authored Rules, FAQ, and custom pages in markdown; managed via Mod → Pages UI; links appear automatically in the site footer; `can_manage_pages` role flag controls who can edit
 - **Site footer** — dynamic links to all published footer pages plus Transparency; scroll-to-footer button in navbar; MIT licence and no-tracking notice
 - **Post editing** — operator toggle; configurable time window (default 90s); live countdown timer restarts on keystroke; edited badge on modified posts
@@ -100,6 +101,7 @@ docker compose exec web python manage.py grant_admin <username>
 - **Allow avatars** — off by default; `max_avatar_size_kb` caps upload size (default 512KB)
 - **Per-user media grant** — `User.can_post_media`; operator-only toggle in Django admin; lets a specific user attach images and videos even when uploads are globally disabled
 - **Allow markdown** — on by default; off renders all post bodies as plain text
+- **Allow links** — off by default; global master switch for `http/https` hyperlinks; individual boards also have their own toggle — both must be on for links to be permitted on a board
 - **Allow post editing** — off by default; `post_edit_window_seconds` sets how long users have (default 90s, 0 = unlimited)
 - **Federation enabled** — master switch for ActivityPub federation
 - **mCaptcha** — set `MCAPTCHA_URL` and `MCAPTCHA_SITE_KEY` in `.env` to enable; honeypot is always active regardless
