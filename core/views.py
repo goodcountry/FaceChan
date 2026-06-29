@@ -128,6 +128,38 @@ def _get_poster_ip(request):
     return request.META.get('REMOTE_ADDR')
 
 
+import re as _re
+_URL_RE = _re.compile(r'https?://', _re.IGNORECASE)
+
+
+def _check_links_allowed(site_settings, board, fields: dict):
+    """
+    Raise ValidationError if a hyperlink (http:// or https://) is found in
+    any of the supplied text fields and links are not permitted.
+
+    ``fields`` maps field name → text value, e.g. {'title': '...', 'body': '...'}.
+    The check is skipped entirely when links are allowed (fast path).
+    """
+    # Global master switch takes precedence
+    if not site_settings.allow_links:
+        for field_name, text in fields.items():
+            if text and _URL_RE.search(text):
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({
+                    field_name: 'Hyperlinks are not permitted on this instance.'
+                })
+        return
+
+    # Global is on — check per-board setting
+    if not board.allow_links:
+        for field_name, text in fields.items():
+            if text and _URL_RE.search(text):
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({
+                    field_name: 'Hyperlinks are not permitted on this board.'
+                })
+
+
 def _exclude_hidden_and_quarantined(qs, user):
     """
     Shared visibility filter for Thread/Post querysets. Quarantine excludes
@@ -680,6 +712,11 @@ class ThreadViewSet(viewsets.ModelViewSet):
             if community.is_private and not community.members.filter(pk=self.request.user.pk).exists():
                 from rest_framework.exceptions import PermissionDenied
                 raise PermissionDenied('You are not a member of this community.')
+        # Check hyperlinks in title and body before any media processing
+        _check_links_allowed(settings, board, {
+            'title': self.request.data.get('title', ''),
+            'body': self.request.data.get('body', ''),
+        })
         # Process image upload if present — validate BEFORE saving the thread
         # so a rejected image doesn't leave an orphaned thread behind
         image_file = self.request.FILES.get('image')
@@ -931,6 +968,11 @@ class PostViewSet(viewsets.ModelViewSet):
 
         parent_id = self.request.data.get('parent_id')
 
+        # Check hyperlinks in body before any media processing
+        _check_links_allowed(settings, thread.board, {
+            'body': self.request.data.get('body', ''),
+        })
+
         # Validate image BEFORE saving the post so a rejected image
         # doesn't leave an orphaned post behind
         image_file = self.request.FILES.get('image')
@@ -1125,6 +1167,13 @@ class PostViewSet(viewsets.ModelViewSet):
         new_body = request.data.get('body', '').strip()
         if not new_body:
             return Response({'error': 'Post body cannot be empty.'}, status=400)
+
+        # Check hyperlinks — same rules apply on edit as on create
+        from rest_framework.exceptions import ValidationError as _VE
+        try:
+            _check_links_allowed(settings, post.thread.board, {'body': new_body})
+        except _VE as exc:
+            return Response(exc.detail, status=400)
 
         post.body = new_body
         post.edited_at = timezone.now()

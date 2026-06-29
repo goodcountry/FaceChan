@@ -12,7 +12,7 @@ import { Plus, RefreshCw, LayoutList, LayoutGrid, Search, X } from 'lucide-react
 export default function BoardDetail() {
   const { slug } = useParams()
   const { user, permissions } = useAuth()
-  const { enable_nsfw_boards, block_nsfw_without_age_gate, allow_image_uploads, allow_video_uploads } = useSiteSettings()
+  const { enable_nsfw_boards, block_nsfw_without_age_gate, allow_image_uploads, allow_video_uploads, allow_links: siteAllowLinks } = useSiteSettings()
   const [threads, setThreads] = useState([])
   const [board, setBoard] = useState(null)
   const [gateNeeded, setGateNeeded] = useState(false)
@@ -251,6 +251,11 @@ export default function BoardDetail() {
             onChange={e => setForm(f => ({ ...f, body: e.target.value }))}
             required
           />
+          {!siteAllowLinks || !board?.allow_links ? (
+            <p className="form-hint muted" style={{ fontSize: '12px', margin: '2px 0 4px' }}>
+              🔗 Hyperlinks (http/https) are not allowed on this board.
+            </p>
+          ) : null}
           {imagePreview && (
             <div className="image-preview">
               <img src={imagePreview} alt="preview" />

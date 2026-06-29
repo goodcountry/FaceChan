@@ -16,7 +16,7 @@ import VideoPlayer from '../components/VideoPlayer'
 import { MessageSquare, CornerDownRight, ChevronDown, ChevronUp, ArrowUp, Bell, BellOff, Pin, PinOff, MessageSquareOff, MessageSquareMore } from 'lucide-react'
 
 // ── Reply composer ────────────────────────────────────────────────────────────
-function ReplyComposer({ threadId, parentId, onPosted, onCancel, placeholder = 'Write a reply…', initialBody = '', showSage = false, allowImages = true, allowVideos = true }) {
+function ReplyComposer({ threadId, parentId, onPosted, onCancel, placeholder = 'Write a reply…', initialBody = '', showSage = false, allowImages = true, allowVideos = true, allowLinks = true }) {
   const [body, setBody] = useState(initialBody)
   const [sage, setSage] = useState(false)
   const [imageFile, setImageFile] = useState(null)
@@ -104,6 +104,11 @@ function ReplyComposer({ threadId, parentId, onPosted, onCancel, placeholder = '
         rows={2}
         required
       />
+      {!allowLinks && (
+        <p className="form-hint muted" style={{ fontSize: '12px', margin: '2px 0 4px' }}>
+          🔗 Hyperlinks (http/https) are not allowed on this board.
+        </p>
+      )}
       {imagePreview && (
         <div className="image-preview">
           <img src={imagePreview} alt="preview" />
@@ -201,7 +206,7 @@ function Reply({ reply, threadId, onReact, onReplyToReply }) {
 }
 
 // ── Top-level comment ─────────────────────────────────────────────────────────
-function Comment({ post, threadId, onReact, onNewReply, allowImages = true, allowVideos = true, allowVideoSound = true, commentsDisabled = false, isNew = false }) {
+function Comment({ post, threadId, onReact, onNewReply, allowImages = true, allowVideos = true, allowVideoSound = true, allowLinks = true, commentsDisabled = false, isNew = false }) {
   const { user } = useAuth()
   const { allow_post_editing, post_edit_window_seconds } = useSiteSettings()
   const [currentPost, setCurrentPost] = useState(post)
@@ -396,6 +401,7 @@ function Comment({ post, threadId, onReact, onNewReply, allowImages = true, allo
             allowImages={allowImages}
             allowVideos={allowVideos}
             allowVideoSound={allowVideoSound}
+            allowLinks={allowLinks}
           />
         )}
       </div>
@@ -407,7 +413,7 @@ function Comment({ post, threadId, onReact, onNewReply, allowImages = true, allo
 export default function ThreadDetail() {
   const { id } = useParams()
   const { user, permissions } = useAuth()
-  const { allow_image_uploads, allow_video_uploads } = useSiteSettings()
+  const { allow_image_uploads, allow_video_uploads, allow_links: siteAllowLinks } = useSiteSettings()
   const { refresh: refreshBell } = useNotifications()
   const [thread, setThread] = useState(null)
   const [posts, setPosts] = useState([])
@@ -593,9 +599,9 @@ export default function ThreadDetail() {
           showSage={true}
           allowImages={thread.allow_images !== false && (allow_image_uploads || !!user?.can_post_media)}
           allowVideos={thread.allow_videos !== false && (allow_video_uploads || !!user?.can_post_media)}
+          allowLinks={!!(siteAllowLinks && thread.allow_links)}
         />
       )}
-      {thread.is_locked && <p className="muted text-center">🔒 This thread is locked — post limit reached.</p>}
       {thread.comments_disabled && <p className="muted text-center">💬 Comments are disabled on this thread.</p>}
       {!user && !thread.comments_disabled && <p className="muted text-center">Log in to comment.</p>}
 
@@ -613,6 +619,7 @@ export default function ThreadDetail() {
             allowImages={thread.allow_images !== false && (allow_image_uploads || !!user?.can_post_media)}
             allowVideos={thread.allow_videos !== false && (allow_video_uploads || !!user?.can_post_media)}
             allowVideoSound={thread.allow_video_sound !== false}
+            allowLinks={!!(siteAllowLinks && thread.allow_links)}
             commentsDisabled={!!thread.comments_disabled}
             isNew={p.id === newPostId}
           />

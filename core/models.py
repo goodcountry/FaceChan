@@ -172,6 +172,12 @@ class Board(models.Model):
     allow_images = models.BooleanField(default=True, help_text='Allow users to attach images to threads and posts on this board.')
     allow_videos = models.BooleanField(default=True, help_text='Allow users to attach short video clips (MP4/WebM) to threads and posts on this board. Automatically disabled when allow_images is off.')
     allow_video_sound = models.BooleanField(default=True, help_text='Allow video clips to include an audio track. Automatically disabled when allow_videos is off.')
+    allow_links = models.BooleanField(
+        default=False,
+        help_text='Allow users to post hyperlinks (http:// or https://) in thread titles, '
+                  'thread bodies, and replies on this board. '
+                  'Has no effect when the global "allow links" setting is disabled.'
+    )
     allow_federation = models.BooleanField(
         default=True,
         help_text='Include this board in ActivityPub federation. '
@@ -581,6 +587,12 @@ class SiteSettings(models.Model):
     allow_markdown = models.BooleanField(
         default=True,
         help_text='Allow markdown formatting in posts and replies. When off, body text is rendered as plain text.')
+    allow_links = models.BooleanField(
+        default=False,
+        help_text='Master switch for hyperlinks. When off, no board may allow hyperlinks regardless of its own setting. '
+                  'When on, individual boards can enable or disable links independently. '
+                  'Links means http:// or https:// URLs — bare domain names are always allowed.'
+    )
     allow_post_editing = models.BooleanField(
         default=False,
         help_text='Allow users to edit their own posts after submission.')
