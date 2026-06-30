@@ -94,20 +94,19 @@ def on_thread_created(sender, instance, created, **kwargs):
                 protect_pk=instance.pk
             )
 
-    # Federation: deliver to remote followers if this board has an AP actor
-    # and the thread has an author (anonymous threads stay local).
-    if instance.author_id is not None:
-        try:
-            from federation.models import Actor
-            from federation.tasks import deliver_create_thread
-            actor = Actor.objects.get(board=instance.board)
-            deliver_create_thread.delay(str(instance.pk), str(actor.pk))
-        except Actor.DoesNotExist:
-            # Board has no AP actor yet — federation not set up for this board
-            pass
-        except Exception:
-            # Never let federation errors break thread creation
-            pass
+    # Federation delivery for newly created threads is handled exclusively
+    # by federation/signals.py's on_thread_created receiver, which guards
+    # on is_remote=False before delivering. Do not duplicate that call here
+    # — this receiver and that one both fire on every Thread save (Django
+    # supports multiple receivers per signal), and a thread that arrives
+    # via inbound federation (is_remote=True) is itself created via
+    # Thread.objects.create(...), which also triggers this same post_save
+    # signal. Calling deliver_create_thread from here unconditionally used
+    # to re-broadcast every inbound federated thread back out under this
+    # instance's own identity — causing the same post to arrive at a third
+    # instance twice (once direct from the origin, once relayed) under two
+    # different Note ids, since each relay regenerates a fresh id from its
+    # own local Thread row rather than preserving the original.
 
 
 @receiver(pre_delete, sender='core.Thread')
