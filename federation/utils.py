@@ -262,9 +262,59 @@ def build_reply_note(post):
         'context': board_actor_url(board.slug),
         'published': post.created_at.isoformat(),
         'url': f'{base_url()}/boards/{board.slug}/threads/{thread.id}',
+        # Relay metadata — see build_thread_note for the full explanation.
+        # Seeded from hop 0 even on origin delivery so the seen-instances
+        # loop guard is complete from the first send.
+        'facechan:relayHopCount': 0,
+        'facechan:relaySeenInstances': [own_domain()],
     }
 
     if not post.author:
+        obj['facechan:anonymous'] = True
+
+    return obj
+
+
+def build_relay_reply_note(post):
+    """
+    Render a remotely-originated Post/reply (is_remote=True) as a Note for
+    onward relay delivery — distinct from build_reply_note, which is for
+    replies that originated on THIS instance. Mirrors build_relay_note's
+    relationship to build_thread_note; see that docstring for the full
+    rationale (preserving original id/author, never regenerating per hop).
+
+    inReplyTo is preserved as the post's own inReplyTo target, recovered
+    the same way build_reply_note derives it — via the parent thread's
+    remote_ap_id if remote, else its local thread_object_url. A relayed
+    reply belongs to whatever thread it was already attached to locally;
+    that resolution already happened on inbound (see
+    federation/inbound.py handle_create_reply / _resolve_parent_thread)
+    and doesn't need to change for relay.
+    """
+    thread = post.thread
+    board = thread.board
+
+    if thread.remote_ap_id:
+        in_reply_to = thread.remote_ap_id
+    else:
+        in_reply_to = thread_object_url(thread.id)
+
+    obj = {
+        '@context': AP_CONTEXT,
+        'id': post.remote_ap_id,
+        'type': 'Note',
+        'content': post.body,
+        'inReplyTo': in_reply_to,
+        'attributedTo': post.remote_actor_url or board_actor_url(board.slug),
+        'to': ['https://www.w3.org/ns/activitystreams#Public'],
+        'cc': [board_followers_url(board.slug)],
+        'context': board_actor_url(board.slug),
+        'published': post.created_at.isoformat(),
+        'facechan:relayed': True,
+        'facechan:relayHopCount': post.relay_hop_count + 1,
+        'facechan:relaySeenInstances': post.relay_seen_instances + [own_domain()],
+    }
+    if not post.remote_actor_url:
         obj['facechan:anonymous'] = True
 
     return obj

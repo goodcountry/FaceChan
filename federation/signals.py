@@ -82,33 +82,37 @@ def on_thread_created(sender, instance, created, **kwargs):
 @receiver(post_save, sender='core.Post')
 def on_post_created(sender, instance, created, **kwargs):
     """
-    When a local reply is created on a federated board, deliver a
-    Create(Note) activity (with inReplyTo) to:
-      - The board inbox of the thread's origin server (remote threads)
-      - All approved followers of the local board Actor
-
-    Guards:
-    - created=True only
-    - is_remote=False (don't re-federate inbound replies)
-    - author is not None (anonymous replies don't federate)
-    - Board and site federation flags checked inside the task
+    When a reply is created, either deliver it (if it originated here) or
+    relay it onward (if it arrived from another instance and relay
+    federation is enabled). Mirrors on_thread_created above — see that
+    docstring for the full guard rationale.
     """
     if not created:
         return
-    if instance.is_remote:
-        return
-    if instance.author is None:
-        return
 
+    from core.models import SiteSettings
     from federation.models import Actor
     from federation.utils import is_federation_configured
-    from core.models import SiteSettings
 
     if not is_federation_configured():
         return
 
     settings = SiteSettings.get()
     if not settings.federation_enabled:
+        return
+
+    if instance.is_remote:
+        if not settings.relay_federation_enabled:
+            return
+        try:
+            actor = Actor.objects.get(board=instance.thread.board)
+        except Actor.DoesNotExist:
+            return
+        from federation.tasks import relay_create_reply
+        relay_create_reply.delay(str(instance.pk), str(actor.pk))
+        return
+
+    if instance.author is None:
         return
 
     try:

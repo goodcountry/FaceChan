@@ -207,6 +207,10 @@ def handle_create_reply(activity, obj, remote_instance, log_entry):
             is_remote=True,
             remote_ap_id=note_id,
             remote_actor_url=attributed_to or "",
+            # See the matching comment in handle_create_note above —
+            # stored exactly as received, no append at receive time.
+            relay_hop_count=obj.get('facechan:relayHopCount', 0),
+            relay_seen_instances=obj.get('facechan:relaySeenInstances', []),
         )
     except Exception as e:
         log_entry.status = "failed"

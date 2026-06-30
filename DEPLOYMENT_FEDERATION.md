@@ -55,7 +55,7 @@ Add a `RemoteInstance` entry manually in Django admin with the remote domain and
 |---|---|---|
 | Threads by account holders | Yes | Delivered to all approved followers on thread creation |
 | Anonymous threads | No | Stay local — no author Actor to attach to |
-| Post replies | Not yet | Roadmap item |
+| Post replies | Yes | Delivered to the thread's followers and, for replies on a remotely-originated thread, back to that thread's origin server too |
 | NSFW boards | Yes, flagged | Remote instances receive the `nsfw: true` flag and can filter accordingly. The same age-verification requirement applies to federated NSFW content on the receiving instance. |
 
 Anonymous posting is a core FaceChan feature and it is preserved — anonymous threads simply do not leave your instance. Account holders post pseudonymously; their Actor is `@username@yourdomain.tld`, which reveals nothing about their real identity.

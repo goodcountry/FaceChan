@@ -282,6 +282,119 @@ def deliver_create_thread(self, thread_id, local_actor_pk):
 
 
 @shared_task(bind=True, max_retries=5, default_retry_delay=60)
+def relay_create_reply(self, post_id, local_actor_pk):
+    """
+    Re-forward a remotely-originated reply (is_remote=True) onward, the
+    same way relay_create_thread does for threads. See that task's
+    docstring for the full loop-prevention rationale — this mirrors it.
+
+    Delivery targets, both subject to the seen-instances skip check:
+      1. The thread's origin server board inbox (same target
+         deliver_create_reply uses for origin replies) — relevant if the
+         origin server hasn't seen this reply via a more direct path yet.
+      2. All approved followers of this instance's local board Actor.
+
+    In practice (1) is very often already in relay_seen_instances, since
+    the origin server is typically where the reply's parent thread (and
+    often the reply itself, if it arrived here via relay rather than
+    being posted by a local user replying to a relayed thread) already
+    came from — the skip check handles that correctly either way rather
+    than this task needing to special-case it.
+    """
+    from core.models import Post, SiteSettings
+    from federation.models import Actor, Follow, FederationActivity, RemoteBoardMapping, RemoteBoard
+    from federation.fetch import deliver_activity
+    from federation.utils import build_relay_reply_note, build_create_activity, is_federation_configured
+
+    try:
+        post = Post.objects.select_related('thread__board', 'author').get(pk=post_id)
+        actor = Actor.objects.get(pk=local_actor_pk)
+    except (Post.DoesNotExist, Actor.DoesNotExist) as e:
+        logger.error('relay_create_reply: %s', e)
+        return
+
+    if not post.is_remote:
+        logger.warning('relay_create_reply called on non-remote post %s — ignoring', post_id)
+        return
+
+    settings = SiteSettings.get()
+    if not settings.federation_enabled or not settings.relay_federation_enabled:
+        return
+    if not is_federation_configured():
+        return
+    if not post.thread.board.allow_federation:
+        return
+    if not post.remote_ap_id:
+        logger.warning('relay_create_reply: post %s has no remote_ap_id, skipping', post_id)
+        return
+
+    if post.relay_hop_count >= settings.max_relay_hops:
+        logger.info('relay_create_reply: post %s at max hop count (%s), not relaying further',
+                     post_id, post.relay_hop_count)
+        return
+
+    note = build_relay_reply_note(post)
+    activity = build_create_activity(actor, note)
+
+    # (domain, inbox_url) pairs, deduplicated by inbox_url — tracking the
+    # domain alongside each target is what lets the seen-instances skip
+    # check be applied per-target, unlike deliver_create_reply's flat
+    # inbox_urls set, which has no need for this since origin delivery
+    # never has a chain to check against.
+    targets = {}  # inbox_url -> domain
+
+    thread = post.thread
+    if thread.is_remote and thread.remote_ap_id:
+        mapping = RemoteBoardMapping.objects.select_related('instance').filter(
+            local_board=thread.board
+        ).first()
+        if mapping:
+            rb = RemoteBoard.objects.filter(
+                instance=mapping.instance,
+                remote_slug=mapping.remote_slug,
+            ).first()
+            if rb and rb.inbox_url:
+                targets[rb.inbox_url] = mapping.instance.domain
+
+    followers = Follow.objects.filter(
+        local_actor=actor, accepted=True
+    ).select_related('remote_actor', 'remote_actor__instance')
+    for follow in followers:
+        targets[follow.remote_actor.inbox_url] = follow.remote_actor.instance.domain
+
+    if not targets:
+        logger.debug('relay_create_reply: no inboxes to deliver to for post %s', post_id)
+        return
+
+    for inbox_url, domain in targets.items():
+        if domain in post.relay_seen_instances:
+            logger.debug('relay_create_reply: skipping %s, already in seen-instances chain', domain)
+            continue
+
+        log = FederationActivity.objects.create(
+            direction='out',
+            activity_type='Create',
+            activity_id=activity.get('id', ''),
+            is_relay=True,
+            local_actor=actor,
+            payload=activity,
+            status='queued',
+        )
+
+        success, status_code, error = deliver_activity(activity, inbox_url, actor)
+
+        if success:
+            log.status = 'delivered'
+            log.save(update_fields=['status'])
+            logger.info('Relayed reply Create to %s', inbox_url)
+        else:
+            log.status = 'failed'
+            log.error = error or f'HTTP {status_code}'
+            log.save(update_fields=['status', 'error'])
+            logger.warning('Failed to relay reply Create to %s: %s', inbox_url, error)
+
+
+@shared_task(bind=True, max_retries=5, default_retry_delay=60)
 def deliver_create_reply(self, post_id, local_actor_pk):
     """
     Deliver a Create(Note) activity for a reply to:
