@@ -165,14 +165,14 @@ Edit `nginx/nginx.conf` (or the prod equivalent in your repo) — set `server_na
 server_name yourdomain.tld www.yourdomain.tld;
 ```
 
-Ensure nginx listens on `0.0.0.0:80` (not `127.0.0.1`) for the Certbot challenge to work, then switch to HTTPS after cert issuance.
+By default `docker-compose.prod.yml` keeps nginx internal-only (no host port binding) — this is correct for onion deployments and lets multiple onion instances share one machine. Clearnet deployments need nginx reachable from the public internet, so this guide uses `docker-compose.clearnet-port.yml` as an extra `-f` flag on top of the base file — it adds the `80:80` host port binding without modifying the shared prod file.
 
 ---
 
 ## Start the stack
 
 ```bash
-docker compose -f docker-compose.prod.yml -p facechan-prod up -d --build
+docker compose -f docker-compose.prod.yml -f docker-compose.clearnet-port.yml -p facechan-prod up -d --build
 ```
 
 Verify all containers are running:
@@ -236,7 +236,7 @@ curl https://yourdomain.tld/.well-known/webfinger?resource=acct:g@yourdomain.tld
 ```bash
 cd ~/FaceChan
 git pull origin main
-docker compose -f docker-compose.prod.yml -p facechan-prod up -d --build
+docker compose -f docker-compose.prod.yml -f docker-compose.clearnet-port.yml -p facechan-prod up -d --build
 docker compose -f docker-compose.prod.yml -p facechan-prod exec web python manage.py migrate
 ```
 
@@ -348,7 +348,7 @@ The core principle is identical: the `.env` variables map directly to the platfo
 - [ ] Docker installed
 - [ ] Domain DNS pointing at server IP
 - [ ] FaceChan cloned, `.env` configured
-- [ ] Stack started with `docker compose -f docker-compose.prod.yml -p facechan-prod up -d --build`
+- [ ] Stack started with `docker compose -f docker-compose.prod.yml -f docker-compose.clearnet-port.yml -p facechan-prod up -d --build`
 - [ ] Migrations run, superuser created, `grant_admin` run
 - [ ] TLS certificate issued via Certbot
 - [ ] Instance accessible at `https://yourdomain.tld`

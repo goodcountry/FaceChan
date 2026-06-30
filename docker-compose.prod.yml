@@ -117,9 +117,22 @@ services:
   nginx:
     image: nginx:1.27-alpine
     restart: always
-    # No host port binding — nginx is only reachable internally by the Tor container.
-    # Tor routes .onion traffic to nginx via the Docker internal network.
-    # This allows multiple instances to run on the same machine without port conflicts.
+    # Internal-only by default — correct for onion deployments and lets multiple
+    # onion instances run on one machine without port conflicts.
+    #
+    # CLEARNET DEPLOYMENTS: you must expose this to the host, or the public
+    # internet (and Certbot's HTTP challenge) cannot reach nginx. Do this with
+    # an override file rather than editing this file directly:
+    #
+    #   docker-compose.clearnet-port.yml:
+    #     services:
+    #       nginx:
+    #         ports:
+    #           - "80:80"
+    #
+    #   docker compose -f docker-compose.prod.yml -f docker-compose.clearnet-port.yml -p <name> up -d
+    #
+    # See DEPLOYMENT_CLEARNET.md for the full clearnet setup.
     expose:
       - "80"
     volumes:

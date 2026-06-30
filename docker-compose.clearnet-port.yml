@@ -1,0 +1,16 @@
+# Override file for clearnet deployments.
+#
+# The base docker-compose.prod.yml keeps nginx internal-only (correct for onion
+# deployments — see DEPLOYMENT_ONION.md). Clearnet deployments need nginx reachable
+# from the public internet for normal traffic and for Certbot's HTTP-01 challenge.
+#
+# Usage:
+#   docker compose -f docker-compose.prod.yml -f docker-compose.clearnet-port.yml \
+#     -p facechan-prod up -d --build
+#
+# See DEPLOYMENT_CLEARNET.md for the full setup.
+
+services:
+  nginx:
+    ports:
+      - "80:80"
