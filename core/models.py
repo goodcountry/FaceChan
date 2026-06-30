@@ -147,6 +147,19 @@ class User(AbstractUser):
                   'when uploads are globally enabled.'
     )
 
+    # Age confirmation for NSFW board visibility — persisted per-account so it
+    # carries across devices/browsers once a user logs in. Logged-out visitors
+    # have no account to attach this to, so they continue to use the
+    # client-side (X-Age-Verified header) flow on every fresh session — this
+    # field has no effect for them. Settable by the user themselves on first
+    # confirmation, or by an operator directly in admin.
+    age_verified = models.BooleanField(
+        default=False,
+        help_text='Whether this user has confirmed they meet the minimum age '
+                  'requirement to view NSFW boards. Persists across devices once '
+                  'set. Has no effect on logged-out/anonymous visitors.'
+    )
+
     REQUIRED_FIELDS = []
 
     def __str__(self):

@@ -67,7 +67,7 @@ export default function BoardDetail() {
     setLoading(true)
     api.get(`/boards/${slug}/`).then(r => {
       setBoard(r.data)
-      const needsGate = r.data.nsfw && gateActive && !isAgeVerified()
+      const needsGate = r.data.nsfw && gateActive && !isAgeVerified(user)
       setGateNeeded(needsGate)
       if (needsGate) {
         setLoading(false)

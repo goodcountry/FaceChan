@@ -97,11 +97,19 @@ def _check_daily_limit(user, queryset, limit, label):
 def _age_gate_passed(request):
     """
     True if the client has confirmed the age gate for NSFW content.
-    The frontend sends this header once the user has confirmed via the
-    AgeGate component (confirmation is stored client-side in localStorage,
-    same pattern as the auth token — there's no server-side session for
-    logged-out users on this anonymous-first platform).
+
+    Logged-in users: checked against User.age_verified, persisted server-side,
+    so confirmation carries across devices/browsers once logged in.
+
+    Logged-out/anonymous users: no account exists to persist against, so this
+    falls back to the client-side flow — the frontend sends X-Age-Verified
+    once the user has confirmed via the AgeGate component, stored client-side
+    in localStorage. Per design, logged-out users never see NSFW boards
+    regardless of any prior confirmation in an earlier session.
     """
+    user = request.user
+    if user and user.is_authenticated:
+        return bool(user.age_verified)
     return request.headers.get('X-Age-Verified') == 'true'
 
 
@@ -1292,6 +1300,7 @@ class MyProfileView(generics.RetrieveUpdateAPIView):
 
         return Response({
             'user': UserSerializer(user).data,
+            'age_verified': user.age_verified,
             'display_name_eligible_at': username_eligible_at,
             'stats': {
                 'op_count': op_threads.count(),
@@ -1304,6 +1313,28 @@ class MyProfileView(generics.RetrieveUpdateAPIView):
             'commented_threads': ThreadListSerializer(commented_threads, many=True, context={'request': request}).data,
             'communities': MembershipSerializer(memberships, many=True, context={'request': request}).data,
         })
+
+
+class AgeConfirmView(generics.GenericAPIView):
+    """
+    POST /api/me/age-confirm/
+    Records that the authenticated user has confirmed they meet the minimum
+    age requirement for NSFW board visibility. Persists on the account, so
+    it carries across devices/browsers — unlike the logged-out flow, which
+    relies on a client-side flag reset every fresh browser/session.
+
+    One-directional by design: this only ever sets age_verified to True.
+    There's no unconfirm endpoint — once a user has confirmed, an operator
+    can still reverse it directly in admin if ever needed.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        if not user.age_verified:
+            user.age_verified = True
+            user.save(update_fields=['age_verified'])
+        return Response({'age_verified': True})
 
 
 class PasswordChangeView(generics.GenericAPIView):

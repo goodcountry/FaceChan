@@ -26,9 +26,9 @@ class RoleAdmin(admin.ModelAdmin):
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
-    list_display = ['username', 'role', 'is_premium', 'can_post_media', 'post_count',
+    list_display = ['username', 'role', 'is_premium', 'can_post_media', 'age_verified', 'post_count',
                      'is_banned', 'is_suspended_display', 'is_staff', 'created_at']
-    list_filter = ['role', 'is_premium', 'can_post_media', 'is_banned', 'is_staff', 'is_active']
+    list_filter = ['role', 'is_premium', 'can_post_media', 'age_verified', 'is_banned', 'is_staff', 'is_active']
     search_fields = ['username', 'email']
     ordering = ['-created_at']
     autocomplete_fields = ['role']
@@ -46,6 +46,13 @@ class UserAdmin(BaseUserAdmin):
             'description': 'Grant this user the ability to attach images and videos even '
                             'when site-wide media uploads are disabled. Operator-only — '
                             'no equivalent exists in the mod panel.'
+        }),
+        ('Age verification', {
+            'fields': ('age_verified',),
+            'description': 'Whether this user has confirmed they meet the minimum age '
+                            'requirement to view NSFW boards. Persists across devices once '
+                            'set — normally set by the user themselves via the age '
+                            'confirmation prompt, settable here directly by an operator.'
         }),
         ('Username history', {
             'fields': ('display_name_last_changed_at',),

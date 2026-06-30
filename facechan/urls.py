@@ -28,6 +28,7 @@ urlpatterns = [
     path('api/feed/', views.FeedView.as_view()),
     path('api/me/', views.MyProfileView.as_view()),  # private profile
     path('api/me/password/', views.PasswordChangeView.as_view()),
+    path('api/me/age-confirm/', views.AgeConfirmView.as_view()),
     path('api/me/avatar/', views.AvatarUploadView.as_view()),
     path('api/me/permissions/', views.MyPermissionsView.as_view()),
     path('api/me/watched/', views.WatchedThreadListView.as_view()),

@@ -222,11 +222,18 @@ class RegisterSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
-        validated_data.pop('age_confirmed', None)
+        age_confirmed = validated_data.pop('age_confirmed', False)
         user = User.objects.create_user(**validated_data)
         # Default display name to username — user can change it immediately
         user.display_name = user.username
-        user.save(update_fields=['display_name'])
+        # Carry the registration-time confirmation through rather than
+        # discarding it — a user who just confirmed their age to register
+        # shouldn't be asked again immediately afterwards for NSFW boards.
+        if age_confirmed:
+            user.age_verified = True
+            user.save(update_fields=['display_name', 'age_verified'])
+        else:
+            user.save(update_fields=['display_name'])
         return user
 
 

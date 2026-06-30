@@ -26,8 +26,25 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
+  // age_verified is deliberately excluded from the shared UserSerializer
+  // (used on posts, public profiles, reports, etc.) to avoid leaking it to
+  // other users, so it isn't present on the login/register response's user
+  // object. Fetched separately here and merged into the stored user.
+  const refreshAgeVerified = useCallback(async () => {
+    if (!localStorage.getItem('token')) return
+    try {
+      const { data } = await api.get('/me/')
+      updateUser({ age_verified: !!data.age_verified })
+    } catch {
+      // Leave existing state untouched on failure.
+    }
+  }, [])
+
   useEffect(() => {
-    if (user) refreshPermissions()
+    if (user) {
+      refreshPermissions()
+      refreshAgeVerified()
+    }
   }, [])
 
   const login = async (username, password) => {
@@ -36,6 +53,7 @@ export function AuthProvider({ children }) {
     localStorage.setItem('user', JSON.stringify(data.user))
     setUser(data.user)
     await refreshPermissions()
+    await refreshAgeVerified()
     return data.user
   }
 
@@ -45,6 +63,7 @@ export function AuthProvider({ children }) {
     localStorage.setItem('user', JSON.stringify(data.user))
     setUser(data.user)
     await refreshPermissions()
+    await refreshAgeVerified()
     return data.user
   }
 
