@@ -188,6 +188,7 @@ So for *inbound* activities from onion instances to work on a clearnet instance,
 - [ ] `AvoidDiskWrites 1` set in torrc
 - [ ] Any promotion done exclusively over Tor via throwaway accounts
 - [ ] `FEDERATION_BASE_URL` set correctly for your deployment type (clearnet / onion / dual-stack)
+- [ ] `ALLOWED_HOSTS` includes your onion address/domain — without this, every request returns 400 Bad Request
 - [ ] Federation allowlist reviewed — no instances approved without consideration
 - [ ] Federation audit log retention reviewed alongside general log policy
 - [ ] If onion-only: understood that `.onion` key loss ends federation relationships; `panic.sh` does this deliberately

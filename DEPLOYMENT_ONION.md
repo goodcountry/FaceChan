@@ -249,6 +249,16 @@ FEDERATION_BASE_URL=http://youronionaddress.onion
 
 Your onion address is not known until after first boot — the instance runs fine without `FEDERATION_BASE_URL` set and federation activates automatically once you add it and restart.
 
+### Also add your onion address to `ALLOWED_HOSTS`
+
+This is easy to miss and causes a confusing failure if skipped: Nginx preserves the real `Host` header on every request (required for federation/ActivityPub to work correctly), so Django sees the actual onion hostname, not `localhost`. If your onion address isn't in `ALLOWED_HOSTS`, every request — including login — fails with a generic `400 Bad Request` and no useful error message in the browser.
+
+```
+ALLOWED_HOSTS=localhost,127.0.0.1,youronionaddress.onion
+```
+
+Do this at the same time as setting `FEDERATION_BASE_URL`, since you'll have the onion address on hand either way, and restart once for both changes.
+
 ### Outbound federation over Tor
 
 For your instance to deliver activities to other `.onion` instances, outbound HTTP to `.onion` addresses must route through Tor. The provided Docker Compose includes a dedicated outbound Tor container (`tor-proxy`) on the internal network for exactly this — separate from the inbound hidden-service container.
@@ -285,6 +295,7 @@ Your `.onion` address is generated from a private key stored on disk. Lose or de
 - [ ] `AvoidDiskWrites 1` set in torrc
 - [ ] Any promotion done exclusively over Tor via throwaway accounts
 - [ ] `FEDERATION_BASE_URL` set correctly for your deployment type (clearnet / onion / dual-stack)
+- [ ] `ALLOWED_HOSTS` includes your onion address/domain — without this, every request returns 400 Bad Request
 - [ ] Federation allowlist reviewed — no instances approved without consideration
 - [ ] Federation audit log retention reviewed alongside general log policy
 - [ ] If onion-only: understood that destroying Tor keys permanently ends federation relationships
