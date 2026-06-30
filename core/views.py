@@ -838,6 +838,16 @@ class ThreadViewSet(viewsets.ModelViewSet):
         # Increment author's post count
         User.objects.filter(pk=self.request.user.pk).update(post_count=F('post_count') + 1)
 
+        # Auto-watch: the author starts watching their own thread, so they
+        # get notified (bell + feed) on replies without an extra manual step.
+        # last_seen_reply_count starts at the thread's current reply_count
+        # (0 for a brand new thread) so nothing is retroactively marked
+        # unread.
+        WatchedThread.objects.get_or_create(
+            user=self.request.user, thread=thread,
+            defaults={'last_seen_reply_count': thread.reply_count},
+        )
+
     def retrieve(self, request, *args, **kwargs):
         # Look up directly rather than via get_object()/get_queryset(), since
         # the queryset excludes ungated NSFW threads entirely — we want a
@@ -1107,9 +1117,20 @@ class PostViewSet(viewsets.ModelViewSet):
         # Increment author's post count for all posts and replies
         User.objects.filter(pk=self.request.user.pk).update(post_count=F('post_count') + 1)
 
+        # Auto-watch: replying to a thread starts watching it too, so the
+        # replier gets notified of further activity without a manual step.
+        # last_seen_reply_count is set to the thread's reply_count as of
+        # this reply (already incremented above) — not 0 — so the user
+        # isn't immediately notified about their own post, and isn't shown
+        # every prior reply in the thread as "unread" either.
+        WatchedThread.objects.get_or_create(
+            user=self.request.user, thread=thread,
+            defaults={'last_seen_reply_count': thread.reply_count},
+        )
+
         # Fan out FeedItem notifications to thread watchers (excluding the poster).
-        # This is what the notification bell will read later — the feed already
-        # shows these via reason='thread_reply'. Bulk-create for efficiency.
+        # The feed shows these via reason='thread_reply', and the same watcher
+        # set feeds the bell (unread count below). Bulk-create for efficiency.
         watchers = WatchedThread.objects.filter(
             thread=thread
         ).exclude(
@@ -1613,9 +1634,14 @@ class WatchedThreadListView(generics.ListAPIView):
     """
     GET /api/me/watched/ — watched threads with unread counts.
 
-    This is the data source for the notification bell when it's built.
-    Returns threads the user is watching, annotated with unread reply count.
-    Ordered by most recent activity first.
+    Data source for the "Watched" tab in /feed and the notification bell
+    badge. Returns threads the user is watching, annotated with unread
+    reply count. Ordered by most recent activity first.
+
+    A user starts watching a thread automatically when they create it or
+    reply to it (see ThreadViewSet/PostViewSet perform_create) — there's
+    no separate "watch" button click required to get notified on your own
+    threads/replies.
     """
     permission_classes = [permissions.IsAuthenticated]
 
@@ -1639,7 +1665,8 @@ class NotificationUnreadCountView(generics.GenericAPIView):
     GET /api/me/notifications/unread-count/ — total unread notifications.
 
     Returns a single integer — the sum of unread replies across all watched
-    threads. This is what the bell badge will poll. Zero cost to compute.
+    threads. Polled by NotificationContext.jsx as a fallback when the
+    WebSocket notification channel is unavailable. Zero cost to compute.
     """
     permission_classes = [permissions.IsAuthenticated]
 

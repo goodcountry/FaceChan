@@ -858,7 +858,7 @@ class WatchedThread(models.Model):
 
     last_seen_reply_count: the reply_count at the time the user last visited
     the thread. Used to compute unread count = thread.reply_count - last_seen.
-    This is also what the notification bell will use to show a badge count.
+    Also drives the notification bell's badge count.
     """
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='watched_threads')
     thread = models.ForeignKey(Thread, on_delete=models.CASCADE, related_name='watchers')
