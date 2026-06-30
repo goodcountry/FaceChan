@@ -62,6 +62,22 @@ Anonymous posting is a core FaceChan feature and it is preserved — anonymous t
 
 ---
 
+## Relay federation (optional)
+
+By default, each instance only delivers content it originated. If three instances want to federate with each other, every instance must follow every other instance directly — a full mesh.
+
+**Relay federation** is an alternative: an instance re-forwards content it receives onward to its own followers, building a chain instead of requiring a full mesh. With relay on, a simple ring (1→2, 2→3, 3→1, each instance only following the one before it) is enough for a post made on instance 1 to eventually reach instance 3, relayed via instance 2.
+
+This is off by default — the simpler, safer mode (full mesh, no relaying) has fewer moving parts and a smaller audit surface. Turn relay on deliberately if you're building a larger web of instances and a full mesh isn't practical.
+
+**To enable:** Django admin → Site settings → Federation → tick `relay_federation_enabled`. `max_relay_hops` (default 5) caps how many instance-to-instance hops a relayed post can travel before this instance stops forwarding it further, regardless of anything else.
+
+**How duplicates are prevented:** a relayed post keeps its original Note ID and original author from the very first instance it was posted on — it is never reissued as a new post from the relaying instance's own identity. Every instance an activity passes through is recorded in the activity itself, and an instance will never relay a post to an instance already in that list. This is what stops a ring topology from looping a post back to where it started, or from a post arriving at the same instance twice via two different paths and being duplicated. The hop limit is a second, blunter backstop for the same problem, in case a non-FaceChan ActivityPub server somewhere in the chain doesn't preserve this metadata.
+
+**What you'll see:** relayed posts show their true original author (`@username@origin-instance.onion`), not the relaying instance. In the Federation activities audit log (Django admin → Federation → Federation activities), outbound entries have an `is_relay` column/filter — `True` for posts being relayed onward, `False` for posts that originated on your instance.
+
+---
+
 ## Your federation identity
 
 Your federation identity is whatever is in `FEDERATION_BASE_URL` — your domain on clearnet, your `.onion` address on onion-only. Losing it severs all your federation relationships permanently.

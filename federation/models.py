@@ -221,6 +221,14 @@ class FederationActivity(models.Model):
     direction = models.CharField(max_length=3, choices=DIRECTION_CHOICES)
     activity_type = models.CharField(max_length=50)   # Create, Follow, Accept, Undo…
     activity_id = models.URLField(blank=True)          # AP @id of the activity
+    is_relay = models.BooleanField(
+        default=False,
+        help_text='True if this is a relay delivery (re-forwarding content that '
+                  'originated on another instance) rather than an origin delivery '
+                  '(content that originated on this instance). Only meaningful for '
+                  'outbound Create activities — see federation/tasks.py '
+                  'relay_create_thread vs deliver_create_thread.'
+    )
     local_actor = models.ForeignKey(
         Actor, null=True, blank=True,
         on_delete=models.SET_NULL, related_name='activities'

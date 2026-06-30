@@ -28,31 +28,46 @@ def on_instance_status_change(sender, instance, created, **kwargs):
 @receiver(post_save, sender='core.Thread')
 def on_thread_created(sender, instance, created, **kwargs):
     """
-    When a local thread is created on a federated board, deliver a
-    Create(Note) activity to all approved followers of the board Actor.
+    When a thread is created, either deliver it (if it originated here) or
+    relay it onward (if it arrived from another instance and relay
+    federation is enabled).
 
-    Guards:
+    Guards (origin delivery, is_remote=False):
     - created=True only (no re-delivery on edits)
-    - is_remote=False (don't re-federate threads that arrived from remote)
     - author is not None (anonymous threads don't federate)
-    - Board and site federation flags checked inside the task
+    - Board and site federation flags checked inside deliver_create_thread
+
+    Guards (relay, is_remote=True):
+    - created=True only
+    - SiteSettings.relay_federation_enabled must be on — see
+      relay_create_thread for the rest (hop limit, seen-instances, etc.)
     """
     if not created:
         return
-    if instance.is_remote:
-        return
-    if instance.author is None:
-        return
 
+    from core.models import SiteSettings
     from federation.models import Actor
     from federation.utils import is_federation_configured
-    from core.models import SiteSettings
 
     if not is_federation_configured():
         return
 
     settings = SiteSettings.get()
     if not settings.federation_enabled:
+        return
+
+    if instance.is_remote:
+        if not settings.relay_federation_enabled:
+            return
+        try:
+            actor = Actor.objects.get(board=instance.board)
+        except Actor.DoesNotExist:
+            return
+        from federation.tasks import relay_create_thread
+        relay_create_thread.delay(str(instance.pk), str(actor.pk))
+        return
+
+    if instance.author is None:
         return
 
     try:

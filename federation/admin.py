@@ -55,8 +55,8 @@ class FollowAdmin(admin.ModelAdmin):
 
 @admin.register(FederationActivity)
 class FederationActivityAdmin(admin.ModelAdmin):
-    list_display = ['activity_type', 'direction', 'status', 'remote_instance', 'created_at']
-    list_filter = ['direction', 'activity_type', 'status']
+    list_display = ['activity_type', 'direction', 'is_relay', 'status', 'remote_instance', 'created_at']
+    list_filter = ['direction', 'activity_type', 'status', 'is_relay']
     search_fields = ['activity_id', 'error']
     readonly_fields = ['id', 'payload', 'created_at', 'updated_at']
     ordering = ['-created_at']

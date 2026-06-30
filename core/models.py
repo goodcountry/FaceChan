@@ -364,7 +364,29 @@ class Thread(models.Model):
     )
     remote_actor_url = models.URLField(
         null=True, blank=True,
-        help_text='AP Actor URL of the remote author. Null for local threads.'
+        help_text='AP Actor URL of the remote author. Null for local threads. '
+                  'Preserved as-is through relay hops — always the ORIGINAL author, '
+                  'never a relaying instance\'s stub user.'
+    )
+
+    # Relay federation (optional, off by default — see SiteSettings.
+    # relay_federation_enabled). When a thread is relayed onward through a
+    # chain of instances rather than only delivered origin-to-follower
+    # directly, these track how it travelled so loops can be prevented and
+    # forwarded copies can carry their full path for debugging.
+    relay_hop_count = models.PositiveIntegerField(
+        default=0,
+        help_text='Number of instance-to-instance hops this activity has travelled. '
+                  '0 for content that originated here or arrived direct from its '
+                  'origin. Incremented by 1 each time an instance relays it onward. '
+                  'Relaying stops once SiteSettings.max_relay_hops is reached.'
+    )
+    relay_seen_instances = models.JSONField(
+        default=list, blank=True,
+        help_text='List of instance domains this activity has already passed through '
+                  '(origin first, most recent relay last). Used to prevent relay loops — '
+                  'an instance must never relay an activity back to a domain already in '
+                  'this list. Empty for content that originated here.'
     )
 
     # Moderation: hidden, not deleted. Hidden content stays in the DB and
@@ -472,8 +494,13 @@ class Post(models.Model):
     remote_actor_url = models.URLField(
         null=True, blank=True,
         help_text='AP URL of the remote actor who authored this post. '
-                  'Null for local posts.'
+                  'Null for local posts. Preserved as-is through relay hops — '
+                  'always the ORIGINAL author, never a relaying instance\'s stub user.'
     )
+
+    # Relay federation — see matching fields on Thread for full explanation.
+    relay_hop_count = models.PositiveIntegerField(default=0)
+    relay_seen_instances = models.JSONField(default=list, blank=True)
 
     class Meta:
         ordering = ['created_at']
@@ -640,6 +667,25 @@ class SiteSettings(models.Model):
                   'Disable to pause all inbound and outbound federation without '
                   'removing instance mappings or board configurations. '
                   'Individual boards can also be excluded via their allow_federation flag.'
+    )
+    relay_federation_enabled = models.BooleanField(
+        default=False,
+        help_text='When on, threads/replies received from one federated instance are '
+                  're-forwarded to this instance\'s own followers, preserving the '
+                  'original author and Note id — building a relay chain (1→2→3) rather '
+                  'than requiring every instance to follow every other instance directly. '
+                  'Off by default: the safer, simpler mode where each instance only '
+                  'delivers what it originates itself. Has no effect if '
+                  'federation_enabled is off.'
+    )
+    max_relay_hops = models.PositiveIntegerField(
+        default=5,
+        help_text='Maximum number of instance-to-instance hops a relayed activity may '
+                  'travel before this instance stops forwarding it further. Caps relay '
+                  'chain length even if the seen-instances loop guard is somehow '
+                  'bypassed (e.g. a non-FaceChan AP server in the chain that doesn\'t '
+                  'preserve the seen-instances field). Only relevant when '
+                  'relay_federation_enabled is on.'
     )
 
     # ── Safety & Compliance (jurisdictional) ──────────────────────────────────

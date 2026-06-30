@@ -110,6 +110,16 @@ def handle_create_note(activity, remote_instance, log_entry):
             is_remote=True,
             remote_ap_id=note_id,
             remote_actor_url=attributed_to or '',
+            # Relay metadata — stored exactly as received. The hop count and
+            # seen-instances list already reflect every instance this
+            # activity has passed through, including the one that just sent
+            # it to us — both build_thread_note (origin) and build_relay_note
+            # (relay) append the sender's own domain before delivery, so we
+            # don't append anything further here at receive time. Defaults
+            # of 0/[] only apply if the sender is a non-FaceChan AP server
+            # that doesn't send this extension at all.
+            relay_hop_count=obj.get('facechan:relayHopCount', 0),
+            relay_seen_instances=obj.get('facechan:relaySeenInstances', []),
         )
     except Exception as e:
         log_entry.status = 'failed'

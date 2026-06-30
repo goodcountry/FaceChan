@@ -117,6 +117,107 @@ def deliver_follow(self, local_actor_pk, remote_board_pk):
 
 
 @shared_task(bind=True, max_retries=5, default_retry_delay=60)
+def relay_create_thread(self, thread_id, local_actor_pk):
+    """
+    Re-forward a remotely-originated thread (is_remote=True) to this
+    instance's own followers — building a relay chain (1→2→3) so instances
+    don't need to follow every other instance directly.
+
+    Separate from deliver_create_thread, which is for content that
+    originated HERE. This task uses build_relay_note (preserves the
+    original Note id and author, never regenerates them from our local
+    stub copy) rather than build_thread_note.
+
+    Only called when SiteSettings.relay_federation_enabled is on — see
+    federation/signals.py on_thread_created, which is also where the
+    is_remote=True guard lives for when this fires at all.
+
+    Loop prevention, two layers:
+      - Hop limit: stop relaying once thread.relay_hop_count would exceed
+        SiteSettings.max_relay_hops.
+      - Seen-instances: never relay TO a domain already present in
+        thread.relay_seen_instances (the chain this activity has already
+        passed through, including its origin).
+    Both guards are belt-and-braces — the hop limit catches cases where a
+    non-FaceChan AP server in the chain doesn't preserve our seen-instances
+    extension field; the seen-instances check is the primary, precise guard.
+    """
+    from core.models import Thread, SiteSettings
+    from federation.models import Actor, Follow, FederationActivity, RemoteInstance
+    from federation.fetch import deliver_activity
+    from federation.utils import build_relay_note, build_create_activity, is_federation_configured
+
+    try:
+        thread = Thread.objects.select_related('board').get(pk=thread_id)
+        actor = Actor.objects.get(pk=local_actor_pk)
+    except (Thread.DoesNotExist, Actor.DoesNotExist) as e:
+        logger.error('relay_create_thread: %s', e)
+        return
+
+    if not thread.is_remote:
+        # Defensive — this task should only ever be queued for remote
+        # threads. A local thread must go through deliver_create_thread.
+        logger.warning('relay_create_thread called on non-remote thread %s — ignoring', thread_id)
+        return
+
+    settings = SiteSettings.get()
+    if not settings.federation_enabled or not settings.relay_federation_enabled:
+        return
+    if not is_federation_configured():
+        return
+    if not thread.board.allow_federation:
+        return
+    if not thread.remote_ap_id:
+        # No origin id to preserve — nothing safe to relay.
+        logger.warning('relay_create_thread: thread %s has no remote_ap_id, skipping', thread_id)
+        return
+
+    if thread.relay_hop_count >= settings.max_relay_hops:
+        logger.info('relay_create_thread: thread %s at max hop count (%s), not relaying further',
+                     thread_id, thread.relay_hop_count)
+        return
+
+    note = build_relay_note(thread)
+    activity = build_create_activity(actor, note)
+
+    followers = Follow.objects.filter(
+        local_actor=actor, accepted=True
+    ).select_related('remote_actor', 'remote_actor__instance')
+
+    for follow in followers:
+        follower_domain = follow.remote_actor.instance.domain
+        if follower_domain in thread.relay_seen_instances:
+            # This follower's instance already saw this activity somewhere
+            # earlier in the chain — relaying to them again would create
+            # exactly the duplicate-delivery bug this feature must avoid.
+            logger.debug('relay_create_thread: skipping %s, already in seen-instances chain', follower_domain)
+            continue
+
+        inbox_url = follow.remote_actor.inbox_url
+        log = FederationActivity.objects.create(
+            direction='out',
+            activity_type='Create',
+            activity_id=activity.get('id', ''),
+            is_relay=True,
+            local_actor=actor,
+            remote_instance=follow.remote_actor.instance,
+            payload=activity,
+            status='queued',
+        )
+
+        success, status_code, error = deliver_activity(activity, inbox_url, actor)
+
+        if success:
+            log.status = 'delivered'
+            log.save(update_fields=['status'])
+        else:
+            log.status = 'failed'
+            log.error = error or f'HTTP {status_code}'
+            log.save(update_fields=['status', 'error'])
+            logger.warning('Failed to relay Create to %s: %s', inbox_url, error)
+
+
+@shared_task(bind=True, max_retries=5, default_retry_delay=60)
 def deliver_create_thread(self, thread_id, local_actor_pk):
     """
     Deliver a Create(Note) activity for a new thread to all approved followers.

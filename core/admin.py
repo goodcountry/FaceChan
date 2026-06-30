@@ -374,6 +374,17 @@ class SiteSettingsAdmin(admin.ModelAdmin):
                 'enable_display_name_change_audit', 'display_name_change_cooldown_days',
             ),
         }),
+        ('Federation', {
+            'description': (
+                'ActivityPub federation with other FaceChan instances. Individual '
+                'boards also have their own allow_federation flag, checked in '
+                'addition to the master switch below.'
+            ),
+            'fields': (
+                'federation_enabled',
+                'relay_federation_enabled', 'max_relay_hops',
+            ),
+        }),
         ('Safety & Compliance', {
             'description': (
                 'Jurisdictional safety controls. These ship ON by default — the '

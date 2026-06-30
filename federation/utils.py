@@ -18,6 +18,20 @@ def base_url():
     return settings.FEDERATION_BASE_URL
 
 
+def own_domain():
+    """
+    This instance's own bare hostname, e.g. 'facechan.example' or
+    'xpidjho....onion' — no scheme, matching the format RemoteInstance.domain
+    is stored in (see federation/views.py _get_approved_instance_for_actor,
+    which extracts remote domains the same way via urlparse(...).netloc).
+    Used for relay loop-prevention: an instance must never relay an
+    activity to a domain that's itself, or that's already in the
+    activity's seen-instances list.
+    """
+    from urllib.parse import urlparse
+    return urlparse(base_url()).netloc
+
+
 def is_federation_configured():
     """
     Returns True if FEDERATION_BASE_URL is set to a real public address.
@@ -155,9 +169,59 @@ def build_thread_note(thread):
         'context': board_actor_url(board.slug),
         'published': thread.created_at.isoformat(),
         'url': f'{base_url()}/boards/{board.slug}/threads/{thread.id}',
+        # Relay metadata, included even on a fresh origin delivery (hop 0)
+        # so the seen-instances loop guard is complete from the very first
+        # send — without this, a ring topology (1→2→3→1) would only be
+        # caught by the blunt max_relay_hops fallback rather than the
+        # precise seen-instances check, since instance 1's own domain
+        # would never appear in the chain it started.
+        'facechan:relayHopCount': 0,
+        'facechan:relaySeenInstances': [own_domain()],
     }
     # Anonymous threads have no author Actor — remote servers must handle this
     if not thread.author:
+        obj['facechan:anonymous'] = True
+
+    return obj
+
+
+def build_relay_note(thread):
+    """
+    Render a remotely-originated Thread (is_remote=True) as a Note for
+    onward relay delivery — distinct from build_thread_note, which is for
+    content that originated on THIS instance.
+
+    Critical differences from build_thread_note:
+      - id is the ORIGINAL Note's remote_ap_id, never regenerated. Relaying
+        the same id onward (rather than building a fresh one from our own
+        local Thread row) is what lets a receiving instance's existing
+        remote_ap_id dedup check actually catch a duplicate arrival via a
+        different relay path.
+      - attributedTo is the ORIGINAL author's remote_actor_url, never this
+        instance's local stub user for that author.
+      - Carries facechan:relayHopCount and facechan:relaySeenInstances so
+        the next hop can continue enforcing the loop guard and hop limit.
+
+    Only call this for is_remote=True threads with relay_federation_enabled
+    on — see federation/tasks.py relay_create_thread.
+    """
+    board = thread.board
+    obj = {
+        '@context': AP_CONTEXT,
+        'id': thread.remote_ap_id,
+        'type': 'Note',
+        'name': thread.title,
+        'content': thread.body,
+        'attributedTo': thread.remote_actor_url or board_actor_url(board.slug),
+        'to': ['https://www.w3.org/ns/activitystreams#Public'],
+        'cc': [board_followers_url(board.slug)],
+        'context': board_actor_url(board.slug),
+        'published': thread.created_at.isoformat(),
+        'facechan:relayed': True,
+        'facechan:relayHopCount': thread.relay_hop_count + 1,
+        'facechan:relaySeenInstances': thread.relay_seen_instances + [own_domain()],
+    }
+    if not thread.remote_actor_url:
         obj['facechan:anonymous'] = True
 
     return obj
