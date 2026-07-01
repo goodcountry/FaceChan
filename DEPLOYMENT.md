@@ -314,6 +314,25 @@ docker-compose -f docker-compose.prod.yml -p facechan-prod up -d
 docker-compose -f docker-compose.prod.yml -p facechan-prod exec web python manage.py createsuperuser
 docker-compose -f docker-compose.prod.yml -p facechan-prod exec web python manage.py grant_admin <username>
 
+# If you ever need to reset a password from the command line (e.g. locked out of admin):
+#
+# Option A — Django changepassword (interactive, type password when prompted).
+# Avoid ! in the password or run `set +H` first to disable bash history expansion,
+# otherwise bash will mangle the password before it reaches Django:
+#
+#   set +H
+#   docker-compose -f docker-compose.prod.yml -p facechan-prod exec web python manage.py changepassword <username>
+#
+# Option B — Python shell (safest, handles any character including !):
+#
+#   docker-compose -f docker-compose.prod.yml -p facechan-prod exec web python manage.py shell -c \
+#     "from django.contrib.auth import get_user_model; U = get_user_model(); \
+#      u = U.objects.get(username='<username>'); u.set_password('<newpassword>'); \
+#      u.save(); print('done')"
+#
+# Note: passwords changed via the Django admin panel are not affected by this bash issue
+# and handle all special characters correctly.
+
 # 9. Back up your Tor keys NOW
 docker volume inspect facechan-prod_tor_keys
 ```
