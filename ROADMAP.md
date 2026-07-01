@@ -14,6 +14,16 @@ _Nothing currently blocking release._
 
 ## 🟡 Medium Priority
 
+### Content scraping protection
+Two complementary layers — both off by default, operator-configurable per board:
+- **Text obfuscation** — break up text strings programmatically before they reach the DOM; options include rendering text via custom fonts with scrambled Unicode mappings, or injecting zero-width spaces (`&#8203;`) dynamically between characters so copy-paste produces garbled output. Targets bulk scrapers and automated archiving tools.
+- **Selection disable** — CSS `user-select: none` combined with React event listeners blocking copy/drag on sensitive threads. Per-board toggle in board settings.
+
+### Mesh networking transport (offline/blackout mode)
+Explore Bluetooth or Wi-Fi Direct ad-hoc syncing as a transport layer for situations where the internet is entirely blacked out — censorship, infrastructure failure, or deliberate isolation. FaceChan's ActivityPub federation model maps reasonably well onto store-and-forward delivery; posts could sync hop-by-hop across nearby devices with no internet required. Research phase only — protocol candidates include Meshtastic, BATMAN-adv, and Briar's transport layer.
+
+
+
 ### Internationalisation (i18n)
 
 FaceChan is built for a global audience. UI translation is on the roadmap.

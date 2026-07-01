@@ -82,6 +82,15 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 USE_TZ = True
 TIME_ZONE = 'UTC'
 
+# ── Security headers ──────────────────────────────────────────────────────────
+# Blocks reflected XSS attempts in older browsers that support the X-XSS-Protection header.
+SECURE_BROWSER_XSS_FILTER = True
+# Prevents this site being embedded in an iframe on another domain (clickjacking).
+X_FRAME_OPTIONS = 'DENY'
+# Prevents browsers from MIME-sniffing a response away from its declared content-type.
+# Stops a malicious upload being executed as a script if the content-type header is wrong.
+SECURE_CONTENT_TYPE_NOSNIFF = True
+
 # ── Celery ────────────────────────────────────────────────────────────────────
 CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='redis://redis:6379/0')
 CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default='redis://redis:6379/0')
