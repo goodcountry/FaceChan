@@ -25,4 +25,4 @@ EXPOSE 8000
 
 # Daphne: ASGI server handling both HTTP and WebSocket connections.
 # Workers are managed by Daphne internally; WEB_CONCURRENCY sets thread count.
-CMD ["sh", "-c", "python manage.py migrate --noinput && python manage.py seed --threads 100 --max-replies 40 && daphne -b 0.0.0.0 -p 8000 facechan.asgi:application"]
+CMD ["sh", "-c", "python manage.py migrate --noinput && daphne -b 0.0.0.0 -p 8000 facechan.asgi:application"]
