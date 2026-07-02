@@ -1295,6 +1295,11 @@ class ConversationViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
     def retrieve(self, request, pk=None):
+        # Uses can_access_private_thread (participant OR audited staff
+        # override) — deliberately NOT _get_owned_conversation below, which
+        # is participant-only. Staff granted the narrow read-only override
+        # can view a thread for a legal request; they should never be able
+        # to leave it or add/remove participants on someone else's behalf.
         from rest_framework.exceptions import NotFound
         try:
             thread = Thread.objects.prefetch_related('participants').get(pk=pk, is_private_message=True)
@@ -1358,6 +1363,79 @@ class ConversationViewSet(viewsets.ViewSet):
 
         serializer = ConversationDetailSerializer(thread, context={'request': request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'])
+    def leave(self, request, pk=None):
+        thread = self._get_owned_conversation(request, pk)
+
+        thread.participants.remove(request.user)
+        WatchedThread.objects.filter(user=request.user, thread=thread).delete()
+
+        # A visible system note in the conversation itself, same as any
+        # other message (author=None — same pattern as an anonymous post).
+        # Skipped if this emptied the conversation; nobody left to see it.
+        if thread.participants.exists():
+            Post.objects.create(
+                thread=thread, author=None,
+                body=f'{request.user.username} left the conversation.',
+                post_number=thread.reply_count + 1,
+            )
+            Thread.objects.filter(pk=thread.pk).update(
+                reply_count=F('reply_count') + 1, last_reply_at=timezone.now()
+            )
+
+        return Response({'left': True})
+
+    @action(detail=True, methods=['post'], url_path='add-participant')
+    def add_participant(self, request, pk=None):
+        from rest_framework.exceptions import ValidationError
+        thread = self._get_owned_conversation(request, pk)
+
+        if not SiteSettings.get().enable_private_messages:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('Private messages are disabled on this instance.')
+
+        username = request.data.get('username', '').strip()
+        if not username:
+            raise ValidationError({'username': 'This field is required.'})
+        try:
+            new_participant = User.objects.get(username=username)
+        except User.DoesNotExist:
+            raise ValidationError({'username': f'Unknown user: {username}'})
+        if thread.participants.filter(pk=new_participant.pk).exists():
+            raise ValidationError({'username': f'{username} is already in this conversation.'})
+
+        thread.participants.add(new_participant)
+        # Backdated to the current count, same convention as everywhere
+        # else WatchedThread is created — they see new activity from here
+        # on, not every prior message retroactively marked unread.
+        WatchedThread.objects.get_or_create(
+            user=new_participant, thread=thread,
+            defaults={'last_seen_reply_count': thread.reply_count},
+        )
+        Post.objects.create(
+            thread=thread, author=None,
+            body=f'{request.user.username} added {username} to the conversation.',
+            post_number=thread.reply_count + 1,
+        )
+        Thread.objects.filter(pk=thread.pk).update(
+            reply_count=F('reply_count') + 1, last_reply_at=timezone.now()
+        )
+        thread.refresh_from_db()
+
+        serializer = ConversationDetailSerializer(thread, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def _get_owned_conversation(self, request, pk):
+        """Shared lookup for actions below: must be an existing participant."""
+        from rest_framework.exceptions import NotFound
+        try:
+            thread = Thread.objects.get(pk=pk, is_private_message=True)
+        except Thread.DoesNotExist:
+            raise NotFound('No conversation matches the given query.')
+        if not thread.participants.filter(pk=request.user.pk).exists():
+            raise NotFound('No conversation matches the given query.')
+        return thread
 
 
 class FeedView(generics.ListAPIView):
