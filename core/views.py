@@ -1426,6 +1426,40 @@ class ConversationViewSet(viewsets.ViewSet):
         serializer = ConversationDetailSerializer(thread, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @action(detail=True, methods=['post'], url_path='remove-participant')
+    def remove_participant(self, request, pk=None):
+        from rest_framework.exceptions import ValidationError
+        thread = self._get_owned_conversation(request, pk)
+
+        username = request.data.get('username', '').strip()
+        if not username:
+            raise ValidationError({'username': 'This field is required.'})
+        if username == request.user.username:
+            raise ValidationError({'username': 'Use the leave endpoint to remove yourself.'})
+        try:
+            target = User.objects.get(username=username)
+        except User.DoesNotExist:
+            raise ValidationError({'username': f'Unknown user: {username}'})
+        if not thread.participants.filter(pk=target.pk).exists():
+            raise ValidationError({'username': f'{username} is not in this conversation.'})
+
+        thread.participants.remove(target)
+        WatchedThread.objects.filter(user=target, thread=thread).delete()
+
+        if thread.participants.exists():
+            Post.objects.create(
+                thread=thread, author=None,
+                body=f'{request.user.username} removed {username} from the conversation.',
+                post_number=thread.reply_count + 1,
+            )
+            Thread.objects.filter(pk=thread.pk).update(
+                reply_count=F('reply_count') + 1, last_reply_at=timezone.now()
+            )
+            thread.refresh_from_db()
+
+        serializer = ConversationDetailSerializer(thread, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
     def _get_owned_conversation(self, request, pk):
         """Shared lookup for actions below: must be an existing participant."""
         from rest_framework.exceptions import NotFound

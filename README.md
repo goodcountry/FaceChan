@@ -114,6 +114,8 @@ Rules and FAQ pages are created automatically. Edit them at **Mod → Pages** �
 
 The community pruning task (`core.tasks.prune_inactive_communities`) is created automatically when migrations run — no manual setup needed. It runs daily at 3am UTC. You can adjust the schedule or disable it via **Admin → Periodic Tasks**.
 
+Private-message conversations have the same kind of task (`core.tasks.prune_inactive_conversations`), also created automatically, running daily at 3:30am UTC. It's disabled by default (`SiteSettings.private_message_retention_days = 0`) — set a number of days under **Admin → Site Settings → Private Messages** to turn it on.
+
 ### 4. Create your first board
 
 **Admin → Boards → Add Board.** Set slug, name, icon emoji, description. Toggle **Allow federation** off to keep a board local-only — it won't appear in the instance discovery endpoint and its threads won't be delivered to remote instances.

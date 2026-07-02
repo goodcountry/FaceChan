@@ -370,6 +370,7 @@ class SiteSettingsAdmin(admin.ModelAdmin):
             ),
             'fields': (
                 'enable_private_messages',
+                'private_message_retention_days',
                 'private_message_staff_access_enabled',
                 'private_message_staff_access_reason',
                 'private_message_staff_access_enabled_by',

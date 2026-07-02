@@ -639,6 +639,13 @@ class SiteSettings(models.Model):
         null=True, blank=True,
         help_text='When private_message_staff_access_enabled was last switched to True. Read-only audit field.'
     )
+    private_message_retention_days = models.PositiveIntegerField(
+        default=0,
+        help_text='Automatically delete private-message conversations that have had no new '
+                  'messages for this many days (mirrors community_prune_days — same '
+                  'no-exceptions daily prune, see core.tasks.prune_inactive_conversations). '
+                  '0 = disabled, conversations kept indefinitely.'
+    )
 
     # ── Media / uploads ───────────────────────────────────────────────────────
     allow_image_uploads = models.BooleanField(
