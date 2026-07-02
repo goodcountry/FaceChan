@@ -48,6 +48,7 @@ class SiteSettingsSerializer(serializers.ModelSerializer):
             'allow_avatars', 'max_avatar_size_kb',
             'allow_video_uploads', 'max_video_size_mb', 'max_video_duration_seconds',
             'registration_open', 'require_email', 'enable_communities', 'allow_markdown',
+            'enable_private_messages',
             'allow_links',
             'allow_post_editing', 'post_edit_window_seconds',
             'enable_nsfw_boards', 'allow_anonymous_posts', 'display_name_change_cooldown_days',
@@ -457,10 +458,11 @@ class ConversationListSerializer(serializers.ModelSerializer):
     """
     participants = UserSerializer(many=True, read_only=True)
     last_message = serializers.SerializerMethodField()
+    unread_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Thread
-        fields = ['id', 'participants', 'last_message', 'reply_count', 'last_reply_at', 'created_at']
+        fields = ['id', 'participants', 'last_message', 'unread_count', 'reply_count', 'last_reply_at', 'created_at']
 
     def get_last_message(self, obj):
         last = obj.posts.order_by('-created_at').first()
@@ -472,6 +474,15 @@ class ConversationListSerializer(serializers.ModelSerializer):
             'body': last.body,
             'created_at': last.created_at,
         }
+
+    def get_unread_count(self, obj):
+        # watch_map is {thread_id: last_seen_reply_count}, built once per
+        # request by ConversationViewSet.list — avoids an N+1 WatchedThread
+        # query per conversation. Same arithmetic as WatchedThread.unread_count.
+        watch_map = self.context.get('watch_map')
+        if not watch_map or obj.id not in watch_map:
+            return 0
+        return max(0, obj.reply_count - watch_map[obj.id])
 
 
 class ConversationDetailSerializer(ConversationListSerializer):

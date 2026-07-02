@@ -3,11 +3,11 @@ import { useAuth } from '../context/AuthContext'
 import { useSiteSettings } from '../context/SiteSettingsContext'
 import { useNotifications } from '../context/NotificationContext'
 import { useTheme } from '../context/ThemeContext'
-import { Hash, Home, Users, ShieldCheck, Bell, Sun, Moon } from 'lucide-react'
+import { Hash, Home, Users, ShieldCheck, Bell, Sun, Moon, MessageCircle } from 'lucide-react'
 
 export default function Navbar() {
   const { user, isStaff } = useAuth()
-  const { site_name, registration_open, enable_communities } = useSiteSettings()
+  const { site_name, registration_open, enable_communities, enable_private_messages } = useSiteSettings()
   const { unread: bellCount } = useNotifications()
   const { theme, toggle } = useTheme()
 
@@ -22,6 +22,9 @@ export default function Navbar() {
         <Link to="/boards"><Hash size={16} /><span className="nav-label"> Boards</span></Link>
         {enable_communities !== false && (
           <Link to="/communities"><Users size={16} /><span className="nav-label"> Communities</span></Link>
+        )}
+        {user && enable_private_messages !== false && (
+          <Link to="/messages"><MessageCircle size={16} /><span className="nav-label"> Messages</span></Link>
         )}
         {user && (
           <Link to="/feed" state={{ tab: 'watched' }} className={`navbar-bell${bellCount > 0 ? ' has-unread' : ''}`} title="Watched threads">

@@ -19,6 +19,8 @@ import Transparency from './pages/Transparency'
 import PublicProfile from './pages/PublicProfile'
 import InvitePage from './pages/InvitePage'
 import SitePageView from './pages/SitePage'
+import Conversations from './pages/Conversations'
+import ConversationDetail from './pages/ConversationDetail'
 import './App.css'
 
 // Lazy-loaded: pulls in MUI + DataGrid (~700KB before gzip), which would
@@ -64,6 +66,8 @@ export default function App() {
               <Route path="/transparency" element={<Transparency />} />
               <Route path="/invite/:token" element={<InvitePage />} />
               <Route path="/pages/:slug" element={<SitePageView />} />
+              <Route path="/messages" element={<Conversations />} />
+              <Route path="/messages/:id" element={<ConversationDetail />} />
               <Route path="/mod" element={<ModRoute><ModLayout><ModQueue /></ModLayout></ModRoute>} />
               <Route path="/mod/quarantine" element={<ModRoute><ModLayout><ModQuarantine /></ModLayout></ModRoute>} />
               <Route path="/mod/users" element={<ModRoute><ModLayout><ModUsers /></ModLayout></ModRoute>} />

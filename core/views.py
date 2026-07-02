@@ -1291,7 +1291,11 @@ class ConversationViewSet(viewsets.ViewSet):
         qs = Thread.objects.filter(
             is_private_message=True, participants=request.user
         ).prefetch_related('participants').order_by('-last_reply_at')
-        serializer = ConversationListSerializer(qs, many=True, context={'request': request})
+        watch_map = dict(
+            WatchedThread.objects.filter(user=request.user, thread__in=qs)
+            .values_list('thread_id', 'last_seen_reply_count')
+        )
+        serializer = ConversationListSerializer(qs, many=True, context={'request': request, 'watch_map': watch_map})
         return Response(serializer.data)
 
     def retrieve(self, request, pk=None):
@@ -1907,8 +1911,15 @@ class WatchedThreadListView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
+        # Private-message conversations are deliberately excluded here even
+        # though the user is watching them too (see ConversationViewSet.create) —
+        # this list feeds the public "Watched threads" tab, which links to
+        # /thread/:id and would 404 for a private thread (ThreadViewSet
+        # excludes them). Conversations get their own inbox UI instead.
+        # The unread COUNT below (NotificationUnreadCountView) intentionally
+        # keeps summing across everything, DMs included — one bell for both.
         watches = WatchedThread.objects.filter(
-            user=request.user
+            user=request.user, thread__is_private_message=False
         ).select_related('thread', 'thread__board', 'thread__author').order_by('-thread__last_reply_at')
 
         return Response([{

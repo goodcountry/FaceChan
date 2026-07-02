@@ -1722,3 +1722,47 @@ select option { background: var(--surface2); }
 .mod-pages-hint {
   font-size: 11px; color: var(--muted); font-family: var(--font-ui);
 }
+
+/* ── Private messages / conversations ─────────────────────────────────── */
+.conversation-list {
+  display: flex; flex-direction: column; gap: 4px; margin-top: 12px;
+}
+.conversation-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: var(--radius);
+  background: var(--surface); text-decoration: none; color: var(--text);
+  border: 1px solid transparent; transition: all 0.15s;
+}
+.conversation-row:hover { background: var(--surface2); text-decoration: none; }
+.conversation-row.has-unread { border-color: var(--accent); font-weight: 600; }
+.conversation-row-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.conversation-row-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.conversation-row-names { font-size: 14px; }
+.conversation-row-preview {
+  font-size: 12px; color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.conversation-unread-badge { position: static; flex-shrink: 0; }
+
+.conversation-detail { display: flex; flex-direction: column; height: calc(100vh - 140px); }
+.conversation-messages {
+  flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;
+  padding: 8px 0;
+}
+.conversation-message-own .fb-reply-bubble { background: var(--accent-soft, var(--surface2)); }
+.conversation-system-note {
+  text-align: center; font-size: 11px; color: var(--muted);
+  font-family: var(--font-ui); padding: 4px 0;
+}
+.conversation-composer { position: sticky; bottom: 0; background: var(--bg); padding-top: 6px; }
+
+.conversation-participants-panel {
+  background: var(--surface); border-radius: var(--radius);
+  padding: 10px 12px; margin: 8px 0; font-size: 13px;
+}
+.conversation-participants-header { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.conversation-participants-list { list-style: none; padding: 0; margin: 0 0 8px; display: flex; flex-direction: column; gap: 4px; }
+.conversation-participants-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.conversation-add-participant { display: flex; gap: 6px; margin-bottom: 8px; }
+.conversation-add-participant input { flex: 1; }
+.conversation-leave-btn { color: var(--danger, #d33); }
