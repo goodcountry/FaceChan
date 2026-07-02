@@ -448,6 +448,46 @@ class ThreadDetailSerializer(ThreadListSerializer):
     def get_watcher_count(self, obj):
         return obj.watchers.count()
 
+class ConversationListSerializer(serializers.ModelSerializer):
+    """
+    A private-message conversation, listed. Reuses Thread under the hood
+    (see Thread.is_private_message) — this serializer just exposes the
+    subset of fields relevant to a DM rather than a board thread (no
+    title/board/community/pin/lock, participants instead of a single author).
+    """
+    participants = UserSerializer(many=True, read_only=True)
+    last_message = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Thread
+        fields = ['id', 'participants', 'last_message', 'reply_count', 'last_reply_at', 'created_at']
+
+    def get_last_message(self, obj):
+        last = obj.posts.order_by('-created_at').first()
+        if last is None:
+            return None
+        return {
+            'id': str(last.id),
+            'author': last.author.username if last.author else None,
+            'body': last.body,
+            'created_at': last.created_at,
+        }
+
+
+class ConversationDetailSerializer(ConversationListSerializer):
+    posts = serializers.SerializerMethodField()
+
+    class Meta(ConversationListSerializer.Meta):
+        fields = ConversationListSerializer.Meta.fields + ['posts']
+
+    def get_posts(self, obj):
+        qs = obj.posts.filter(parent__isnull=True).select_related('author').prefetch_related(
+            'reactions', 'replies__author', 'replies__reactions'
+        ).order_by('created_at')
+        qs = _visible_to(qs, self.context.get('request'))
+        return PostSerializer(qs, many=True, context=self.context).data
+
+
 class CommunityInviteSerializer(serializers.ModelSerializer):
     """Returned to admins/mods managing invites for their community."""
     created_by_username = serializers.CharField(source='created_by.username', read_only=True)

@@ -121,12 +121,15 @@ class PostInline(admin.TabularInline):
 @admin.register(Thread)
 class ThreadAdmin(admin.ModelAdmin):
     list_display = ['title', 'board', 'community', 'author', 'poster_ip', 'reply_count',
-                    'view_count', 'is_pinned', 'comments_disabled', 'is_locked', 'is_hidden', 'is_quarantined', 'last_reply_at']
-    list_filter = ['board', 'is_pinned', 'comments_disabled', 'is_locked', 'is_hidden', 'is_quarantined', 'community']
+                    'view_count', 'is_pinned', 'comments_disabled', 'is_locked', 'is_hidden',
+                    'is_quarantined', 'is_private_message', 'last_reply_at']
+    list_filter = ['board', 'is_pinned', 'comments_disabled', 'is_locked', 'is_hidden',
+                    'is_quarantined', 'is_private_message', 'community']
     search_fields = ['title', 'body', 'author__username']
     readonly_fields = ['reply_count', 'view_count', 'last_reply_at', 'created_at',
                         'hidden_by', 'hidden_at', 'quarantined_by', 'quarantined_at',
                         'poster_ip']
+    autocomplete_fields = ['participants']
     list_editable = ['is_pinned', 'comments_disabled', 'is_locked']
     inlines = [PostInline]
     ordering = ['-last_reply_at']
@@ -358,6 +361,21 @@ class SiteSettingsAdmin(admin.ModelAdmin):
         ('Communities', {
             'fields': ('max_communities', 'max_communities_per_user', 'community_prune_days'),
         }),
+        ('Private Messages', {
+            'description': (
+                'Staff access is OFF by default and should stay off for routine use — '
+                'private threads are otherwise visible only to their participants. Turning '
+                'it on (e.g. for a law-enforcement request) requires a reason and is '
+                'stamped with who enabled it and when, below, as a permanent audit record.'
+            ),
+            'fields': (
+                'enable_private_messages',
+                'private_message_staff_access_enabled',
+                'private_message_staff_access_reason',
+                'private_message_staff_access_enabled_by',
+                'private_message_staff_access_enabled_at',
+            ),
+        }),
         ('Media & Uploads', {
             'fields': (
                 'allow_image_uploads', 'max_image_size_mb',
@@ -400,6 +418,14 @@ class SiteSettingsAdmin(admin.ModelAdmin):
             ),
         }),
     )
+
+    readonly_fields = ['private_message_staff_access_enabled_by', 'private_message_staff_access_enabled_at']
+
+    def save_model(self, request, obj, form, change):
+        # See SiteSettings.save(): reads _changed_by to attribute the audit
+        # stamp when private_message_staff_access_enabled flips to True.
+        obj._changed_by = request.user
+        super().save_model(request, obj, form, change)
 
     def has_add_permission(self, request):
         """Only one row allowed — hide the Add button if it already exists."""

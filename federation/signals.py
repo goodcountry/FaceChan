@@ -45,6 +45,13 @@ def on_thread_created(sender, instance, created, **kwargs):
     if not created:
         return
 
+    # Private-message threads never federate, full stop — checked before
+    # anything else here, not left to the Actor.DoesNotExist fallthrough
+    # on the hidden DM board (belt-and-suspenders: that board should never
+    # have an Actor, but this guard doesn't depend on that staying true).
+    if instance.is_private_message:
+        return
+
     from core.models import SiteSettings
     from federation.models import Actor
     from federation.utils import is_federation_configured
@@ -88,6 +95,11 @@ def on_post_created(sender, instance, created, **kwargs):
     docstring for the full guard rationale.
     """
     if not created:
+        return
+
+    # Private-message threads never federate — see matching guard in
+    # on_thread_created above.
+    if instance.thread.is_private_message:
         return
 
     from core.models import SiteSettings

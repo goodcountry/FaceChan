@@ -15,6 +15,7 @@ from .serializers import (
     ModReportSerializer, SanctionedUserSerializer,
     CommunityInviteSerializer, CommunityInvitePreviewSerializer,
     SitePageSerializer, SitePageListSerializer,
+    ConversationListSerializer, ConversationDetailSerializer,
 )
 from .image_utils import process_image, process_avatar, compute_perceptual_hash, generate_thumbnail
 from .video_utils import process_video, extract_video_thumbnail, compute_video_perceptual_hash
@@ -22,7 +23,7 @@ from .csam_detection import scan_image, report_match
 from .permissions import (
     can_moderate, hide_content, unhide_content,
     quarantine_content, restore_from_quarantine, purge_content, can_purge_content,
-    pin_thread, unpin_thread, set_comments_disabled
+    pin_thread, unpin_thread, set_comments_disabled, can_access_private_thread
 )
 from django.core.files.base import ContentFile
 from django.utils import timezone
@@ -270,13 +271,38 @@ class LoginView(generics.GenericAPIView):
         return Response({'token': token.key, 'user': UserSerializer(user).data})
 
 
+def get_or_create_dm_board():
+    """
+    The hidden system board that holds every private-message thread.
+    is_system=True keeps it out of BoardViewSet's public listing and out of
+    the normal board-assignment UI for board-scoped staff (see Board.is_system
+    help_text and can_access_private_thread in permissions.py). Federation is
+    off both here and via the is_private_message guard in federation/signals.py.
+    """
+    board, _ = Board.objects.get_or_create(
+        slug='_dm',
+        defaults={
+            'name': 'Private Messages',
+            'description': 'System board — holds private message threads. Not a real board.',
+            'icon': '✉️',
+            'allow_images': True,
+            'allow_videos': True,
+            'allow_video_sound': True,
+            'allow_links': True,
+            'allow_federation': False,
+            'is_system': True,
+        }
+    )
+    return board
+
+
 class BoardViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = BoardSerializer
     lookup_field = 'slug'
     permission_classes = [permissions.AllowAny]
 
     def get_queryset(self):
-        qs = Board.objects.annotate(thread_count=Count('threads')).order_by('name')
+        qs = Board.objects.annotate(thread_count=Count('threads')).order_by('name').exclude(is_system=True)
         user = self.request.user
         if not (user and user.is_authenticated and _age_gate_passed(self.request)):
             qs = qs.exclude(nsfw=True)
@@ -648,7 +674,13 @@ class ThreadViewSet(viewsets.ModelViewSet):
         return [permissions.IsAuthenticated()]
 
     def get_queryset(self):
-        qs = Thread.objects.select_related('author', 'board', 'community')
+        # Private-message threads are never reachable through the ordinary
+        # Thread endpoints — they only exist via ConversationViewSet. This
+        # exclusion is defense-in-depth: they live on a hidden board that
+        # nothing else here queries for anyway, but a thread ID could still
+        # be guessed/leaked, so keep this explicit rather than relying on
+        # obscurity.
+        qs = Thread.objects.select_related('author', 'board', 'community').exclude(is_private_message=True)
 
         board = self.request.query_params.get('board')
         community = self.request.query_params.get('community')
@@ -710,6 +742,9 @@ class ThreadViewSet(viewsets.ModelViewSet):
         board_slug = self.request.data.get('board')
         community_slug = self.request.data.get('community')
         board = Board.objects.get(slug=board_slug)
+        if board.is_system:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('This board does not accept ordinary threads.')
         if board.nsfw and _nsfw_gate_active() and not _age_gate_passed(self.request):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied('This board is age-gated. Confirm your age to post here.')
@@ -857,6 +892,12 @@ class ThreadViewSet(viewsets.ModelViewSet):
         except Thread.DoesNotExist:
             from rest_framework.exceptions import NotFound
             raise NotFound('No Thread matches the given query.')
+        if instance.is_private_message:
+            # Never reachable here — use ConversationViewSet instead. Same
+            # 404-not-403 treatment as hidden/quarantined content below, so
+            # this endpoint doesn't confirm a private thread ID even exists.
+            from rest_framework.exceptions import NotFound
+            raise NotFound('No Thread matches the given query.')
         if instance.board.nsfw and _nsfw_gate_active() and not _age_gate_passed(request):
             return Response({'error': 'This board is age-gated.', 'nsfw_gate': True}, status=403)
         # Gate private community threads
@@ -952,12 +993,27 @@ class PostViewSet(viewsets.ModelViewSet):
         return PostSerializer
 
     def get_queryset(self):
+        thread_pk = self.kwargs.get('thread_pk')
         qs = Post.objects.filter(
-            thread=self.kwargs.get('thread_pk'),
+            thread=thread_pk,
             parent__isnull=True
         ).select_related('author').prefetch_related(
             'reactions', 'replies__author', 'replies__reactions'
         ).order_by('created_at')
+
+        # Private-message gate: this endpoint is also how conversation
+        # messages are listed/posted/edited/reacted-to/reported (it's the
+        # same Post model and the same URL shape, nested under thread_pk).
+        # A non-participant gets an empty queryset here, which propagates
+        # to 404s on retrieve/react/report/edit via get_object() — same
+        # not-confirming-existence treatment as hidden/quarantined content.
+        try:
+            thread = Thread.objects.only('id', 'is_private_message').get(pk=thread_pk)
+        except Thread.DoesNotExist:
+            return qs.none()
+        if not can_access_private_thread(self.request.user, thread):
+            return qs.none()
+
         return _exclude_hidden_and_quarantined(qs, self.request.user)
 
     def create(self, request, *args, **kwargs):
@@ -969,6 +1025,10 @@ class PostViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         thread = Thread.objects.select_related('board').get(pk=self.kwargs['thread_pk'])
+
+        if not can_access_private_thread(self.request.user, thread):
+            from rest_framework.exceptions import NotFound
+            raise NotFound('No Thread matches the given query.')
 
         if thread.is_locked:
             from rest_framework.exceptions import PermissionDenied
@@ -1213,6 +1273,93 @@ class PostViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
+class ConversationViewSet(viewsets.ViewSet):
+    """
+    Private messaging. A "conversation" is a Thread with
+    is_private_message=True living on the hidden DM system board (see
+    get_or_create_dm_board) — see Thread model docstring for why this reuses
+    Thread/Post rather than a separate model.
+
+    Sending/listing messages within an existing conversation is NOT handled
+    here — that's the ordinary /api/threads/<thread_pk>/posts/ endpoint,
+    gated by can_access_private_thread() in PostViewSet. This viewset only
+    covers starting a conversation and listing/retrieving your own.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def list(self, request):
+        qs = Thread.objects.filter(
+            is_private_message=True, participants=request.user
+        ).prefetch_related('participants').order_by('-last_reply_at')
+        serializer = ConversationListSerializer(qs, many=True, context={'request': request})
+        return Response(serializer.data)
+
+    def retrieve(self, request, pk=None):
+        from rest_framework.exceptions import NotFound
+        try:
+            thread = Thread.objects.prefetch_related('participants').get(pk=pk, is_private_message=True)
+        except Thread.DoesNotExist:
+            raise NotFound('No conversation matches the given query.')
+        if not can_access_private_thread(request.user, thread):
+            raise NotFound('No conversation matches the given query.')
+        serializer = ConversationDetailSerializer(thread, context={'request': request})
+        return Response(serializer.data)
+
+    def create(self, request):
+        from rest_framework.exceptions import PermissionDenied, ValidationError
+
+        if not SiteSettings.get().enable_private_messages:
+            raise PermissionDenied('Private messages are disabled on this instance.')
+
+        usernames = request.data.get('participants', [])
+        if isinstance(usernames, str):
+            usernames = [usernames]
+        usernames = [u for u in usernames if u and u != request.user.username]
+        if not usernames:
+            raise ValidationError({'participants': 'At least one other participant is required.'})
+
+        users = list(User.objects.filter(username__in=usernames))
+        missing = set(usernames) - {u.username for u in users}
+        if missing:
+            raise ValidationError({'participants': f'Unknown user(s): {", ".join(sorted(missing))}'})
+
+        body = request.data.get('body', '').strip()
+        if not body:
+            raise ValidationError({'body': 'An initial message is required to start a conversation.'})
+
+        board = get_or_create_dm_board()
+        thread = Thread.objects.create(
+            board=board,
+            author=request.user,
+            title='Private conversation',
+            body='',
+            is_private_message=True,
+        )
+        all_participants = [request.user] + users
+        thread.participants.add(*all_participants)
+
+        post = Post.objects.create(
+            thread=thread, author=request.user, body=body, post_number=1,
+            poster_ip=_get_poster_ip(request),
+        )
+        Thread.objects.filter(pk=thread.pk).update(reply_count=1, last_reply_at=timezone.now())
+        thread.refresh_from_db()
+
+        # Auto-watch every participant (not just the sender) so ordinary
+        # replies via PostViewSet — which fans out FeedItem + WebSocket
+        # notifications to a thread's watchers — notify the whole
+        # conversation for free, with no PM-specific notification code.
+        for u in all_participants:
+            WatchedThread.objects.get_or_create(
+                user=u, thread=thread, defaults={'last_seen_reply_count': thread.reply_count}
+            )
+
+        User.objects.filter(pk=request.user.pk).update(post_count=F('post_count') + 1)
+
+        serializer = ConversationDetailSerializer(thread, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
 class FeedView(generics.ListAPIView):
     serializer_class = ThreadListSerializer
     permission_classes = [permissions.AllowAny]
@@ -1220,7 +1367,9 @@ class FeedView(generics.ListAPIView):
     def get_queryset(self):
         user = self.request.user
 
-        # Base: exclude private community threads unless member
+        # Base: exclude private community threads unless member, and always
+        # exclude private-message threads — those surface only via
+        # ConversationViewSet/WatchedThread notifications, never this feed.
         base_q = Q(community__isnull=True) | Q(community__is_private=False)
 
         if user.is_authenticated:
@@ -1228,7 +1377,7 @@ class FeedView(generics.ListAPIView):
             # Include private community threads if member
             base_q = base_q | Q(community__in=joined, community__is_private=True)
 
-            qs = Thread.objects.filter(base_q).select_related('author', 'board', 'community').annotate(
+            qs = Thread.objects.filter(base_q).exclude(is_private_message=True).select_related('author', 'board', 'community').annotate(
                 priority=Case(
                     When(community__in=joined, then=0),
                     default=1,
@@ -1236,7 +1385,7 @@ class FeedView(generics.ListAPIView):
                 )
             ).order_by('priority', '-last_reply_at').distinct()
         else:
-            qs = Thread.objects.filter(base_q).select_related('author', 'board').order_by('-last_reply_at')
+            qs = Thread.objects.filter(base_q).exclude(is_private_message=True).select_related('author', 'board').order_by('-last_reply_at')
 
         if _nsfw_gate_active() and not _age_gate_passed(self.request):
             qs = qs.exclude(board__nsfw=True)

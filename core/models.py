@@ -198,6 +198,12 @@ class Board(models.Model):
                   'instance board list and threads will not be delivered to remote instances. '
                   'Admin-only setting.'
     )
+    is_system = models.BooleanField(
+        default=False,
+        help_text='Internal board not shown in the public board list or board-scoped '
+                  'moderation assignment (e.g. the hidden board that holds private '
+                  'message threads). Not intended to be created or edited by operators.'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     def clean(self):
@@ -414,6 +420,24 @@ class Thread(models.Model):
     quarantined_at = models.DateTimeField(null=True, blank=True)
     quarantine_reason = models.CharField(max_length=200, blank=True)
 
+    # Private messages: a private thread is a normal Thread living on the
+    # hidden system board (see Board.is_system / get_or_create_dm_board
+    # in core/views.py), restricted to its participants. Reusing Thread/Post
+    # for this — rather than a separate model — means DMs get post/reply
+    # mechanics, CSAM hashing, and the report/quarantine pipeline for free.
+    # is_private_message and participants are never client-writable via the
+    # ordinary Thread serializers; only ConversationViewSet sets them.
+    is_private_message = models.BooleanField(
+        default=False,
+        help_text='True for a private-message conversation thread. Excluded from all '
+                  'public listings, feeds, and federation regardless of other settings.'
+    )
+    participants = models.ManyToManyField(
+        User, blank=True, related_name='private_threads',
+        help_text='Invited members of a private-message thread. Only meaningful when '
+                  'is_private_message is True.'
+    )
+
     class Meta:
         ordering = ['-is_pinned', '-last_reply_at']
 
@@ -587,6 +611,35 @@ class SiteSettings(models.Model):
                   '0 = pruning disabled.'
     )
 
+    # ── Private messages ─────────────────────────────────────────────────────
+    enable_private_messages = models.BooleanField(
+        default=True,
+        help_text='Allow members to start private-message conversations with each other. '
+                  'When off, no new conversations can be started (existing ones remain '
+                  'in the database but become inaccessible).'
+    )
+    private_message_staff_access_enabled = models.BooleanField(
+        default=False,
+        help_text='OFF by default. When enabled, admin-tier staff can read private-message '
+                  'threads via the report/mod-queue path even without a report being filed. '
+                  'Intended for a narrow purpose — e.g. responding to a law-enforcement '
+                  'request — not routine moderation. Every toggle to True is stamped below '
+                  'for the audit trail; fill in a reason before saving.'
+    )
+    private_message_staff_access_reason = models.CharField(
+        max_length=300, blank=True,
+        help_text='Required justification for turning staff access on (e.g. case/request '
+                  'reference). Kept as a permanent record even after the flag is turned back off.'
+    )
+    private_message_staff_access_enabled_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name='+',
+        help_text='Admin who last switched private_message_staff_access_enabled to True. Read-only audit field.'
+    )
+    private_message_staff_access_enabled_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text='When private_message_staff_access_enabled was last switched to True. Read-only audit field.'
+    )
+
     # ── Media / uploads ───────────────────────────────────────────────────────
     allow_image_uploads = models.BooleanField(
         default=True,
@@ -744,9 +797,30 @@ class SiteSettings(models.Model):
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
 
+    def clean(self):
+        if self.private_message_staff_access_enabled and not self.private_message_staff_access_reason.strip():
+            raise ValidationError({
+                'private_message_staff_access_reason':
+                    'A reason is required to enable staff access to private messages.'
+            })
+
     def save(self, *args, **kwargs):
-        """Force pk=1 so there can only ever be one row."""
+        """
+        Force pk=1 so there can only ever be one row. Also stamps the
+        private-message staff-access audit fields the moment the flag
+        transitions False → True — see the field's help_text. `_changed_by`
+        is set by SiteSettingsAdmin.save_model() before calling save();
+        anywhere else that flips this flag directly (shell, scripts) should
+        set it too, or the audit trail will just show no admin attributed.
+        """
         self.pk = 1
+        if self.private_message_staff_access_enabled:
+            was_enabled = SiteSettings.objects.filter(
+                pk=1, private_message_staff_access_enabled=True
+            ).exists()
+            if not was_enabled:
+                self.private_message_staff_access_enabled_at = timezone.now()
+                self.private_message_staff_access_enabled_by = getattr(self, '_changed_by', None)
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):

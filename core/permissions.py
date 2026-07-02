@@ -132,6 +132,40 @@ def can_moderate(user, content, capability):
     return False
 
 
+def can_access_private_thread(user, thread):
+    """
+    Gate for private-message threads (Thread.is_private_message=True).
+
+    This is deliberately separate from can_moderate()'s board/community
+    scoping above — a private thread lives on a hidden system board, and
+    the normal "board-assigned staff can act on this board's content" path
+    must NOT apply to it (an admin assigning a mod to every board must not
+    incidentally hand them everyone's DMs). Access is either:
+      - participant, or
+      - SiteSettings.private_message_staff_access_enabled is True AND the
+        user holds an admin-tier role — the narrow, audited, operator-only
+        override for things like a law-enforcement request. Board-scoped
+        staff (mod/janitor/board-admin) never qualify, regardless of flags.
+
+    Returns True unconditionally for non-private threads, so callers can
+    use this as a blanket check without branching on is_private_message
+    themselves.
+    """
+    if not thread.is_private_message:
+        return True
+    if not user or not user.is_authenticated:
+        return False
+    if thread.participants.filter(pk=user.pk).exists():
+        return True
+    from .models import SiteSettings
+    settings = SiteSettings.get()
+    if settings.private_message_staff_access_enabled:
+        role = getattr(user, 'role', None)
+        if role is not None and role.is_admin_tier:
+            return True
+    return False
+
+
 def can_purge_content(user):
     """
     Purge is irreversible, so it's hard-gated to admin-tier in code, not

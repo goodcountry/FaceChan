@@ -9,6 +9,7 @@ router = DefaultRouter()
 router.register('boards', views.BoardViewSet, basename='board')
 router.register('communities', views.CommunityViewSet, basename='community')
 router.register('threads', views.ThreadViewSet, basename='thread')
+router.register('conversations', views.ConversationViewSet, basename='conversation')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
