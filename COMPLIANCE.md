@@ -163,6 +163,35 @@ jurisdiction actually requires if law enforcement does come asking.
 
 ---
 
+## Private messages
+
+Private-message conversations reuse `Thread`/`Post` internally, so everything above
+(CSAM hashing, the report queue, hide/quarantine/purge) already applies to them the
+same as any public post — starting a conversation or sending a message doesn't opt
+out of any of it.
+
+Two things are specific to private messages and worth knowing before you need them:
+
+- **`private_message_staff_access_enabled`** (Admin → Site Settings → Private
+  Messages) is OFF by default. With it off, staff can only see a private thread's
+  content if a participant reports it — there is no ambient moderation visibility
+  into DMs, by design. Turning it on requires a written reason (stored permanently,
+  even after you turn it back off) and is stamped with who enabled it and when. It's
+  meant for a narrow, deliberate situation — e.g. responding to a specific
+  law-enforcement request — not routine moderation, and it only grants read access
+  to admin-tier staff; board-scoped mods/janitors never get it, regardless of what
+  boards they're assigned to.
+- **`private_message_retention_days`** (same settings page, 0 = disabled by default)
+  auto-deletes conversations with no new messages for that many days, on the same
+  daily Celery Beat schedule as community pruning. As with community pruning, this
+  is a blunt, no-exceptions retention rule, not something you can exempt individual
+  conversations from. Decide your retention window the same way you'd decide any
+  other retention policy on this instance — see "IP address logging" below for the
+  general shape of that reasoning, GDPR/UK GDPR applies to message content the same
+  way it applies to anything else identifiable to a user.
+
+---
+
 ## IP address logging
 
 FaceChan stores the submitting IP address (`poster_ip`) on every thread and post at the moment of submission. This address is also snapshotted into the `Report` row at report-filing time (`target_poster_ip`) so it survives any subsequent purge of the underlying content.

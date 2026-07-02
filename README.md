@@ -32,6 +32,7 @@ MIT licensed. Fork it. Run it. Make it yours.
 - **Thread pinning + comments control** — pin threads, disable/enable comments independently
 - **Duck Roll word filter** — per-board and site-wide word/phrase substitution at read time; raw text always preserved
 - **Automated community pruning** — inactive communities deleted on a schedule via Celery; periodic task created automatically on first migration run
+- **Private messages** — group-capable conversations between members, reusing the same post/reply mechanics (and CSAM/report/quarantine pipeline) as everything else; operator kill switch; audited admin-only override for staff visibility (off by default); automated pruning of inactive conversations on the same schedule as communities
 - **Bot protection** — honeypot field on all submission forms (silent reject); optional self-hosted mCaptcha (Tor-compatible, no third parties)
 - **Login name vs display name** — `username` is the private stable login credential; `display_name` is shown publicly and changeable (with cooldown); duplicate display names allowed — everyone can be "anonymous"
 - **Solarized light/dark mode** — per-user toggle in navbar; persists to `localStorage`; respects `prefers-color-scheme`; no flash on load
@@ -205,7 +206,7 @@ FaceChan/
 │   ├── routing.py             # WebSocket routing (/ws/notifications/, /ws/boards/<slug>/)
 │   ├── signals.py             # post_save hooks (thread culling, federation delivery)
 │   ├── permissions.py         # Moderation permission resolver
-│   ├── tasks.py               # Celery tasks (community pruning)
+│   ├── tasks.py               # Celery tasks (community pruning, conversation pruning)
 │   └── management/commands/
 │       ├── seed.py
 │       └── prune_communities.py
@@ -233,6 +234,8 @@ FaceChan/
 │   │   │   ├── ModQueue.jsx
 │   │   │   ├── ModQuarantine.jsx
 │   │   │   └── ModUsers.jsx
+│   │   ├── Conversations.jsx             # /messages — private message inbox
+│   │   ├── ConversationDetail.jsx        # /messages/:id — one conversation
 │   │   └── ...
 │   ├── context/
 │   └── api/
@@ -280,6 +283,19 @@ FaceChan/
 | POST | `/api/me/avatar/` | Upload avatar |
 | GET | `/api/me/watched/` | Watched threads + unread |
 | GET | `/api/me/permissions/` | Staff role + capabilities |
+
+### Private messages (authenticated)
+
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/api/conversations/` | List your conversations, with per-conversation unread count |
+| POST | `/api/conversations/` | Start a conversation (`participants`: usernames, `body`: first message) |
+| GET | `/api/conversations/:id/` | Conversation detail + messages (participant, or audited staff override) |
+| POST | `/api/conversations/:id/leave/` | Leave a conversation |
+| POST | `/api/conversations/:id/add-participant/` | Add a participant (any current participant can) |
+| POST | `/api/conversations/:id/remove-participant/` | Remove a participant (any current participant can, not yourself) |
+
+Sending a message reuses the ordinary reply endpoint — `POST /api/threads/:id/posts/` — with the conversation's id as `:id`, gated to participants only. See `COMPLIANCE.md` → "Private messages" for the staff-access override and retention settings.
 
 ### Staff / moderation
 
