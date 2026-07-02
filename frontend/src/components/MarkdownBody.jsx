@@ -20,17 +20,19 @@ function parseMarkdown(text) {
   html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g,
     '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
   html = html.replace(/^---$/gm, '<hr>')
-  // Collapse blank lines between bullet list items
-  html = html.replace(/(^- .+$)\n{2,}(?=^- )/gm, '$1\n')
-  html = html.replace(/(^- .+$(\n^- .+$)*)/gm, match => {
+  // Collapse blank lines between bullet list items then group them
+  html = html.replace(/(- .+)\n{2,}(?=- )/g, '$1\n')
+  html = html.replace(/(- .+(
+- .+)*)/g, match => {
     const items = match.split('\n').map(line =>
       `<li>${line.replace(/^- /, '')}</li>`
     ).join('')
     return `<ul>${items}</ul>`
   })
-  // Collapse blank lines between numbered list items so they're treated as one block
-  html = html.replace(/(^\d+\. .+$)\n{2,}(?=^\d+\. )/gm, '$1\n')
-  html = html.replace(/(^\d+\. .+$(\n^\d+\. .+$)*)/gm, match => {
+  // Collapse blank lines between numbered list items then group them
+  html = html.replace(/(\d+\. .+)\n{2,}(?=\d+\. )/g, '$1\n')
+  html = html.replace(/(\d+\. .+(
+\d+\. .+)*)/g, match => {
     const items = match.split('\n').map(line =>
       `<li>${line.replace(/^\d+\. /, '')}</li>`
     ).join('')
