@@ -7,6 +7,13 @@ function parseMarkdown(text) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
 
+  // Normalize lines that are visually blank but contain stray whitespace
+  // (e.g. pasted content), so the list-collapsing regexes below can
+  // detect them as blank lines. Without this, a "blank" line containing
+  // a stray space breaks list grouping and every item renders as its
+  // own single-item list (e.g. numbered items all showing "1.").
+  html = html.split('\n').map(line => (line.trim() === '' ? '' : line)).join('\n')
+
   html = html.replace(/```[\w]*\n?([\s\S]*?)```/g, (_, code) =>
     `<pre><code>${code.trim()}</code></pre>`
   )
