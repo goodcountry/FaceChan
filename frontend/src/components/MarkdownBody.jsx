@@ -26,6 +26,13 @@ function parseMarkdown(text) {
     ).join('')
     return `<ul>${items}</ul>`
   })
+  html = html.replace(/(^\d+\. .+$(
+^\d+\. .+$)*)/gm, match => {
+    const items = match.split('\n').map(line =>
+      `<li>${line.replace(/^\d+\. /, '')}</li>`
+    ).join('')
+    return `<ol>${items}</ol>`
+  })
   html = html.split(/\n\n+/).map(block => {
     block = block.trim()
     if (!block) return ''
