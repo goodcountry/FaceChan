@@ -14,6 +14,9 @@ _Nothing currently blocking release._
 
 ## 🟡 Medium Priority
 
+### Proper markdown parser
+The current renderer (`utils/markdown.js`, `MarkdownBody.jsx`) is a hand-rolled regex pipeline — chosen originally to avoid an external dependency. It works for the common cases but regex-based parsing is fundamentally brittle for anything with nested or multi-line structure: list grouping in particular relies on detecting blank lines between items, and edge cases (e.g. a "blank" line that actually contains stray whitespace from pasted content) can silently break the grouping, which showed up as a real bug where every numbered list item rendered as "1." instead of incrementing. A proper tokenizing parser (e.g. `marked`, `markdown-it`, or a small custom AST-based implementation) would handle these structural cases correctly by construction instead of needing point patches for each newly discovered edge case. Worth revisiting once the dependency-free constraint is reassessed — trade-off is bundle size vs. correctness/maintainability.
+
 ### Content scraping protection
 Two complementary layers — both off by default, operator-configurable per board:
 - **Text obfuscation** — break up text strings programmatically before they reach the DOM; options include rendering text via custom fonts with scrambled Unicode mappings, or injecting zero-width spaces (`&#8203;`) dynamically between characters so copy-paste produces garbled output. Targets bulk scrapers and automated archiving tools.
