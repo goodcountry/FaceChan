@@ -377,7 +377,41 @@ The whole thing runs on a single Linux machine. If you can get two local onion i
 
 ---
 
-*FaceChan is MIT-licensed software. The author is not responsible for your deployment. Stay safe.*
+## Managing boards
+
+FaceChan ships with no boards by default. You create them yourself via the Django admin (`/admin/`) or the management commands below.
+
+**Seed boards + sample content (useful for testing)**
+
+```bash
+sudo docker-compose -f docker-compose.prod.yml -p <project> exec web python manage.py seed
+```
+
+This creates 11 default boards (tech, cooking, gaming, music, diy, fitness, film, outdoors, animals, current, random) and populates each with 25 threads and realistic reply counts. Safe to run on a fresh instance — it skips thread seeding if threads already exist, so it won't duplicate content on restart.
+
+Optional flags:
+
+```bash
+python manage.py seed --threads 10       # fewer threads per board
+python manage.py seed --max-replies 20   # cap reply count
+```
+
+**Start clean (no boards)**
+
+If you want a blank instance — no boards, no seed content — just don't run `seed`. Create boards manually via `/admin/` after your first login.
+
+**Remove all boards from a running instance**
+
+```bash
+sudo docker-compose -f docker-compose.prod.yml -p <project> exec web python manage.py shell -c \
+  "from core.models import Board; count = Board.objects.count(); Board.objects.all().delete(); print(f'Deleted {count} boards')"
+```
+
+Note: deleting a board cascades to all its threads and posts. This is irreversible.
+
+---
+
+## Known issues
 
 **`docker-compose` fails with `ModuleNotFoundError: No module named 'distutils'`** —
 Ubuntu 24.04 ships Python 3.12, which dropped `distutils` from the standard
@@ -386,3 +420,7 @@ Try `sudo apt install python3-setuptools -y` first. If that doesn't resolve it,
 switch to the Compose v2 plugin: `sudo apt remove docker-compose -y && sudo apt
 install docker-compose-v2 -y`, then use `docker compose` (space) instead of
 `docker-compose` (hyphen) for all commands on that machine.
+
+---
+
+*FaceChan is MIT-licensed software. The author is not responsible for your deployment. Stay safe.*
