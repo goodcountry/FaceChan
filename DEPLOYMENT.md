@@ -378,3 +378,11 @@ The whole thing runs on a single Linux machine. If you can get two local onion i
 ---
 
 *FaceChan is MIT-licensed software. The author is not responsible for your deployment. Stay safe.*
+
+**`docker-compose` fails with `ModuleNotFoundError: No module named 'distutils'`** —
+Ubuntu 24.04 ships Python 3.12, which dropped `distutils` from the standard
+library. The `docker.io`-packaged `docker-compose` (v1.29.2) still depends on it.
+Try `sudo apt install python3-setuptools -y` first. If that doesn't resolve it,
+switch to the Compose v2 plugin: `sudo apt remove docker-compose -y && sudo apt
+install docker-compose-v2 -y`, then use `docker compose` (space) instead of
+`docker-compose` (hyphen) for all commands on that machine.
