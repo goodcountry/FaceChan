@@ -27,10 +27,11 @@ const DEFAULT_SETTINGS = {
   mcaptcha_site_key: '',
 }
 
-const SiteSettingsContext = createContext(DEFAULT_SETTINGS)
+const SiteSettingsContext = createContext({ ...DEFAULT_SETTINGS, settingsLoaded: false })
 
 export function SiteSettingsProvider({ children }) {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS)
+  const [settingsLoaded, setSettingsLoaded] = useState(false)
 
   useEffect(() => {
     fetch('/api/site-settings/')
@@ -43,10 +44,11 @@ export function SiteSettingsProvider({ children }) {
       .catch(() => {
         // API unreachable — fall back to defaults silently
       })
+      .finally(() => setSettingsLoaded(true))
   }, [])
 
   return (
-    <SiteSettingsContext.Provider value={settings}>
+    <SiteSettingsContext.Provider value={{ ...settings, settingsLoaded }}>
       {children}
     </SiteSettingsContext.Provider>
   )
