@@ -152,9 +152,19 @@ def build_thread_note(thread):
     The board is the attributedTo Group; the author Person is also included
     if the thread has an account-holder author.
     """
+    from federation.models import Actor
+
     board = thread.board
     attributed = [board_actor_url(board.slug)]
-    if thread.author and hasattr(thread.author, 'ap_actor'):
+    if thread.author:
+        # get_or_create rather than hasattr(..., 'ap_actor') — an Actor row
+        # otherwise only exists once some remote server has fetched
+        # /ap/users/<username> at least once (see UserActorView), which is
+        # incidental to whether *this* post should be attributed to them.
+        # Without this, a user's very first federated post (before anyone's
+        # fetched their actor) silently loses its author attribution and
+        # falls back to the board alone, indistinguishable from anonymous.
+        Actor.objects.get_or_create(user=thread.author, defaults={'actor_type': 'Person'})
         attributed.append(user_actor_url(thread.author.username))
 
     obj = {
@@ -247,7 +257,13 @@ def build_reply_note(post):
         in_reply_to = thread_object_url(thread.id)
 
     attributed = board_actor_url(board.slug)
-    if post.author and hasattr(post.author, 'ap_actor'):
+    if post.author:
+        # See the matching comment in build_thread_note — get_or_create
+        # rather than hasattr(..., 'ap_actor'), so attribution doesn't
+        # depend on some remote server having already fetched this user's
+        # actor document.
+        from federation.models import Actor
+        Actor.objects.get_or_create(user=post.author, defaults={'actor_type': 'Person'})
         attributed = [attributed, user_actor_url(post.author.username)]
 
     obj = {
