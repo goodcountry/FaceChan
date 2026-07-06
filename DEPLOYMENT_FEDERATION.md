@@ -58,7 +58,31 @@ Add a `RemoteInstance` entry manually in Django admin with the remote domain and
 | Post replies | Yes | Delivered to the thread's followers and, for replies on a remotely-originated thread, back to that thread's origin server too |
 | NSFW boards | Yes, flagged | Remote instances receive the `nsfw: true` flag and can filter accordingly. The same age-verification requirement applies to federated NSFW content on the receiving instance. |
 
-Anonymous posting is a core FaceChan feature and it is preserved — anonymous threads simply do not leave your instance. Account holders post pseudonymously; their Actor is `@username@yourdomain.tld`, which reveals nothing about their real identity.
+Anonymous posting is a core FaceChan feature and it is preserved — anonymous threads and replies simply never leave your instance in the first place. Account holders post pseudonymously; their Actor is `@username@yourdomain.tld`, which reveals nothing about their real identity.
+
+*Note on relaying:* if relay federation is on and you receive an anonymous thread/reply from another instance, your instance can still re-forward it onward in the chain — that content already left its origin instance as anonymous (flagged `facechan:anonymous`) before it reached you, so relaying it onward doesn't change that. It's only *locally originated* anonymous content that never federates out at all.
+
+---
+
+## Federation maintenance commands
+
+Two `manage.py` commands exist for fixing up federation stub users (the local placeholder accounts created for remote authors) after the fact — both are safe to re-run and support `--dry-run`:
+
+**`backfill_remote_display_names`** — re-fetches each remote Actor document for existing stub users with a blank `display_name` and fills it in from the actor's `name` field. Needed once, for stub users created before display names were saved at creation time; harmless to run again afterwards since it only targets blank `display_name`s.
+
+```
+python manage.py backfill_remote_display_names --dry-run
+python manage.py backfill_remote_display_names
+```
+
+**`fix_misattributed_board_authors`** — removes stub users that were wrongly created from a board's Group actor instead of a Person (`remote_actor_url` containing `/ap/boards/`), a symptom of anonymous federated content being misattributed before the `facechan:anonymous` handling fix. Deleting them restores the affected threads/posts to anonymous, since `author` is `SET_NULL`.
+
+```
+python manage.py fix_misattributed_board_authors --dry-run
+python manage.py fix_misattributed_board_authors
+```
+
+`backfill_remote_display_names` also accepts `--delay` (seconds between fetches, default 0.5) to be polite to remote instances — see `--help` on either command for the full option list.
 
 ---
 
