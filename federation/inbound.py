@@ -77,7 +77,11 @@ def handle_create_note(activity, remote_instance, log_entry):
         log_entry.save(update_fields=['status', 'error'])
         return
 
-    # Resolve or create stub user for the remote author
+    # Resolve or create stub user for the remote author.
+    # Anonymous posts are attributed to the board's own Group actor (see
+    # build_thread_note), not a Person — obj['facechan:anonymous'] is how
+    # the origin server tells us that, so we must not treat that Group
+    # actor as if it were the post's author.
     attributed_to = obj.get('attributedTo', '')
     if isinstance(attributed_to, list):
         # Take the first Person actor if multiple attributions
@@ -85,7 +89,10 @@ def handle_create_note(activity, remote_instance, log_entry):
             (a for a in attributed_to if isinstance(a, str) and 'users' in a),
             attributed_to[0] if attributed_to else ''
         )
-    remote_author = _get_or_create_stub_user(attributed_to, remote_instance)
+    if obj.get('facechan:anonymous'):
+        remote_author = None
+    else:
+        remote_author = _get_or_create_stub_user(attributed_to, remote_instance)
 
     # Build the thread
     title = obj.get('name', '') or obj.get('summary', '') or _truncate(obj.get('content', ''), 100)
@@ -181,14 +188,20 @@ def handle_create_reply(activity, obj, remote_instance, log_entry):
         log_entry.save(update_fields=["status", "error"])
         return
 
-    # Resolve or create stub user for the remote author
+    # Resolve or create stub user for the remote author.
+    # See the matching comment in handle_create_note — anonymous replies are
+    # attributed to the board's Group actor, not a Person, and facechan:anonymous
+    # is how the origin server signals that.
     attributed_to = obj.get("attributedTo", "")
     if isinstance(attributed_to, list):
         attributed_to = next(
             (a for a in attributed_to if isinstance(a, str) and "users" in a),
             attributed_to[0] if attributed_to else ""
         )
-    remote_author = _get_or_create_stub_user(attributed_to, remote_instance)
+    if obj.get('facechan:anonymous'):
+        remote_author = None
+    else:
+        remote_author = _get_or_create_stub_user(attributed_to, remote_instance)
 
     body = obj.get("content", "")
     if not body:
@@ -322,6 +335,19 @@ def _get_or_create_stub_user(actor_url, remote_instance):
     try:
         from federation.fetch import fetch_remote_actor
         data = fetch_remote_actor(actor_url)
+        actor_type = data.get('type', 'Person')
+        if actor_type != 'Person':
+            # Boards/relays federate as Group actors. A caller should not be
+            # asking us to attribute a post to one of these — callers are
+            # expected to check facechan:anonymous first — but guard here too
+            # in case a non-FaceChan sender hands us a Group actor URL without
+            # that flag. Refusing to create a "Person" stub from it prevents a
+            # post ending up attributed to a board/instance name.
+            logger.warning(
+                'Refusing to create stub user from non-Person actor (%s): %s',
+                actor_type, actor_url,
+            )
+            return None
         preferred = data.get('preferredUsername', '')
         domain = urlparse(actor_url).netloc
         username = f'{preferred}@{domain}' if preferred else None
