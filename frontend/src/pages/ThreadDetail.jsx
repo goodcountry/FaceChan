@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import api from '../api/client'
 import ReactionBar from '../components/ReactionBar'
 import BadgeDisplay from '../components/BadgeDisplay'
+import FederatedBadge from '../components/FederatedBadge'
 import ReportButton from '../components/ReportButton'
 import HiddenBadge from '../components/HiddenBadge'
 import AgeGate from '../components/AgeGate'
@@ -184,6 +185,7 @@ function Reply({ reply, threadId, onReact, onReplyToReply }) {
       <div className="fb-reply-bubble">
         <div className="fb-reply-header">
           <UserLink author={reply.author} />
+          <FederatedBadge author={reply.author} />
           <BadgeDisplay badge={reply.author?.display_badge} />
           {reply.author?.is_premium && !reply.author?.display_badge && <span className="premium-badge">PRO</span>}
           {reply.sage && <span className="sage-indicator">sage</span>}
@@ -306,6 +308,7 @@ function Comment({ post, threadId, onReact, onNewReply, allowImages = true, allo
         <div className="fb-comment-bubble">
           <div className="fb-comment-header">
             <UserLink author={currentPost.author} />
+            <FederatedBadge author={currentPost.author} />
             <BadgeDisplay badge={currentPost.author?.display_badge} />
             {currentPost.author?.is_premium && !currentPost.author?.display_badge && <span className="premium-badge">PRO</span>}
             {currentPost.post_number && <span className="post-number">#{currentPost.post_number}</span>}
@@ -536,6 +539,7 @@ export default function ThreadDetail() {
             <img src={thread.author.avatar} alt="" style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover', verticalAlign: 'middle' }} />
           )}
           <UserLink author={thread.author} />
+          <FederatedBadge author={thread.author} />
           <BadgeDisplay badge={thread.author?.display_badge} />
           <span className="fb-time">{timeAgo(thread.created_at)}</span>
           {thread.is_hidden && user && thread.author?.id === user.id && <HiddenBadge />}
