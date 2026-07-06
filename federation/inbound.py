@@ -344,6 +344,7 @@ def _get_or_create_stub_user(actor_url, remote_instance):
 
     user = User.objects.create(
         username=final_username,
+        display_name=display_name[:150],
         is_remote=True,
         remote_actor_url=actor_url,
         is_active=False,  # cannot log in
