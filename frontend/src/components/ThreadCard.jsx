@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { MessageSquare, Eye, Pin, PinOff, MessageSquareOff, MessageSquareMore } from 'lucide-react'
 import ReactionBar from './ReactionBar'
 import BadgeDisplay from './BadgeDisplay'
+import FederatedBadge from './FederatedBadge'
 import ReportButton from './ReportButton'
 import HiddenBadge from './HiddenBadge'
 import VideoPlayer from './VideoPlayer'
@@ -54,6 +55,7 @@ export default function ThreadCard({ thread: initialThread, onReact, position, c
         </Link>
         <span className="thread-author">
           {thread.author ? (thread.author.display_name || thread.author.username) : 'Anonymous'}
+          <FederatedBadge author={thread.author} />
           <BadgeDisplay badge={thread.author?.display_badge} />
           {thread.author?.is_premium && !thread.author?.display_badge && (
             <span className="premium-badge">PRO</span>
