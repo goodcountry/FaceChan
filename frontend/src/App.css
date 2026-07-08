@@ -677,6 +677,8 @@ textarea { min-height: 100px; }
 }
 .fb-body {
   font-size: 14px; line-height: 1.55; color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
 }
 
 /* ── Markdown rendering ───────────────────────────────────────────────────── */
