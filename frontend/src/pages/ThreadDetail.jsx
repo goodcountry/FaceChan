@@ -102,7 +102,7 @@ function ReplyComposer({ threadId, parentId, onPosted, onCancel, placeholder = '
         placeholder={placeholder}
         value={body}
         onChange={e => setBody(e.target.value)}
-        rows={2}
+        rows={4}
         required
       />
       {!allowLinks && (
