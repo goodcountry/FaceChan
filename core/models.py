@@ -380,6 +380,8 @@ class Thread(models.Model):
     view_count = models.PositiveIntegerField(default=0)
     last_reply_at = models.DateTimeField(default=timezone.now)
     created_at = models.DateTimeField(auto_now_add=True)
+    edited_at = models.DateTimeField(null=True, blank=True)
+    edit_count = models.PositiveIntegerField(default=0)
     poster_ip = models.GenericIPAddressField(
         null=True, blank=True,
         help_text='IP address of the poster at submission time. Admin-only. Raw address — handle as personal data per your jurisdiction.'

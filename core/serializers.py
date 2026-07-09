@@ -416,8 +416,11 @@ class ThreadListSerializer(serializers.ModelSerializer):
                   'author', 'title', 'body', 'image', 'thumbnail',
                   'video', 'video_thumbnail', 'video_duration',
                   'is_pinned', 'is_locked', 'is_hidden', 'comments_disabled', 'reply_count', 'view_count',
-                  'reactions', 'reaction_count', 'last_reply_at', 'created_at',
+                  'reactions', 'reaction_count', 'last_reply_at', 'created_at', 'edited_at', 'edit_count',
                   'allow_images', 'allow_videos', 'allow_video_sound', 'allow_links', 'markdown_enabled']
+        read_only_fields = ['is_pinned', 'is_locked', 'is_hidden', 'comments_disabled',
+                             'reply_count', 'view_count', 'last_reply_at', 'created_at',
+                             'edited_at', 'edit_count']
 
     def get_reactions(self, obj):
         return get_reaction_summary(obj, self.context.get('request') and self.context['request'].user)

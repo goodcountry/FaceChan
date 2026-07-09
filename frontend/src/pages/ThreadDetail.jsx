@@ -423,7 +423,7 @@ function Comment({ post, threadId, onReact, onNewReply, allowImages = true, allo
 export default function ThreadDetail() {
   const { id } = useParams()
   const { user, permissions } = useAuth()
-  const { allow_image_uploads, allow_video_uploads, allow_links: siteAllowLinks } = useSiteSettings()
+  const { allow_image_uploads, allow_video_uploads, allow_links: siteAllowLinks, allow_post_editing, post_edit_window_seconds } = useSiteSettings()
   const { refresh: refreshBell } = useNotifications()
   const [thread, setThread] = useState(null)
   const [posts, setPosts] = useState([])
@@ -432,6 +432,12 @@ export default function ThreadDetail() {
   const [nsfwGate, setNsfwGate] = useState(false)
   const [watching, setWatching] = useState(false)
   const [watcherCount, setWatcherCount] = useState(0)
+  const [editingOp, setEditingOp] = useState(false)
+  const [editOpBody, setEditOpBody] = useState('')
+  const [editOpError, setEditOpError] = useState(null)
+  const [editOpSaving, setEditOpSaving] = useState(false)
+  const [editOpStart, setEditOpStart] = useState(null)
+  const [opSecondsLeft, setOpSecondsLeft] = useState(null)
 
   // canPin is computed once thread is loaded — needs board_slug and community info
   const canPin = (() => {
@@ -465,6 +471,55 @@ export default function ThreadDetail() {
       })
       setThread(t => ({ ...t, comments_disabled: data.comments_disabled }))
     } catch { alert('Could not toggle comments.') }
+  }
+
+  const isOpOwner = user && thread && thread.author?.id === user.id
+  const canEditOp = allow_post_editing && isOpOwner
+
+  useEffect(() => {
+    if (!canEditOp || !thread || post_edit_window_seconds === 0) return
+    const updateTimer = () => {
+      const base = editOpStart || new Date(thread.created_at).getTime()
+      const age = (Date.now() - base) / 1000
+      const left = Math.max(0, post_edit_window_seconds - age)
+      setOpSecondsLeft(Math.ceil(left))
+    }
+    updateTimer()
+    const interval = setInterval(updateTimer, 1000)
+    return () => clearInterval(interval)
+  }, [canEditOp, post_edit_window_seconds, thread?.created_at, editOpStart])
+
+  const opWithinWindow = post_edit_window_seconds === 0 || (opSecondsLeft !== null && opSecondsLeft > 0)
+
+  const startEditOp = () => {
+    setEditOpBody(thread.body)
+    setEditOpError(null)
+    setEditingOp(true)
+  }
+
+  const handleEditOpChange = val => {
+    setEditOpStart(Date.now())
+    setEditOpBody(val)
+  }
+
+  const cancelEditOp = () => {
+    setEditingOp(false)
+    setEditOpError(null)
+  }
+
+  const saveEditOp = async () => {
+    if (!editOpBody.trim()) return
+    setEditOpSaving(true)
+    setEditOpError(null)
+    try {
+      const { data } = await api.patch(`/threads/${id}/edit/`, { body: editOpBody.trim() })
+      setThread(t => ({ ...t, ...data }))
+      setEditingOp(false)
+    } catch (err) {
+      setEditOpError(err.response?.data?.error || 'Could not save edit.')
+    } finally {
+      setEditOpSaving(false)
+    }
   }
 
   const loadThread = () => {
@@ -549,6 +604,9 @@ export default function ThreadDetail() {
           <FederatedBadge author={thread.author} />
           <BadgeDisplay badge={thread.author?.display_badge} />
           <span className="fb-time">{timeAgo(thread.created_at)}</span>
+          {thread.edited_at && (
+            <span className="edited-badge" title={`Edited ${timeAgo(thread.edited_at)}`}>edited</span>
+          )}
           {thread.is_hidden && user && thread.author?.id === user.id && <HiddenBadge />}
         </div>
         {thread.author?.tagline && (
@@ -564,12 +622,41 @@ export default function ThreadDetail() {
             soundAllowed={thread.allow_video_sound !== false}
           />
         )}
-        <MarkdownBody text={thread.body} className="fb-body markdown-body thread-op-body" markdownEnabled={thread.markdown_enabled} />
+        {editingOp ? (
+          <div className="edit-composer">
+            <textarea
+              className="edit-textarea"
+              value={editOpBody}
+              onChange={e => handleEditOpChange(e.target.value)}
+              autoFocus
+              disabled={editOpSaving}
+            />
+            {editOpError && <div className="form-error">{editOpError}</div>}
+            <div className="edit-actions">
+              {post_edit_window_seconds > 0 && opSecondsLeft !== null && (
+                <span className="edit-timer" style={{ color: opSecondsLeft < 15 ? 'var(--danger)' : 'var(--muted)' }}>
+                  {opSecondsLeft}s
+                </span>
+              )}
+              <button className="btn-ghost btn-tiny" onClick={cancelEditOp} disabled={editOpSaving}>Cancel</button>
+              <button className="btn-primary btn-tiny" onClick={saveEditOp} disabled={editOpSaving || !editOpBody.trim()}>
+                {editOpSaving ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <MarkdownBody text={thread.body} className="fb-body markdown-body thread-op-body" markdownEnabled={thread.markdown_enabled} />
+        )}
         <div className="thread-op-footer">
           <ReactionBar reactions={thread.reactions || []} onReact={handleThreadReact} />
           <span className="thread-stats-inline">
             <MessageSquare size={13} /> {thread.reply_count} comments
           </span>
+          {canEditOp && opWithinWindow && !editingOp && (
+            <button className="fb-action-btn" onClick={startEditOp} title={post_edit_window_seconds > 0 ? `${opSecondsLeft}s to edit` : 'Edit thread'}>
+              ✏️ Edit{post_edit_window_seconds > 0 && opSecondsLeft !== null ? ` (${opSecondsLeft}s)` : ''}
+            </button>
+          )}
           {user && (
             <button
               className={`btn-ghost btn-tiny watch-btn${watching ? ' watching' : ''}`}

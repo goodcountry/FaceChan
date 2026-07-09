@@ -979,6 +979,42 @@ class ThreadViewSet(viewsets.ModelViewSet):
         set_comments_disabled(thread, disabled=bool(disabled))
         return Response({'comments_disabled': thread.comments_disabled})
 
+    @action(detail=True, methods=['patch'], permission_classes=[permissions.IsAuthenticated])
+    def edit(self, request, pk=None):
+        thread = self.get_object()
+        settings = SiteSettings.get()
+
+        if not settings.allow_post_editing:
+            return Response({'error': 'Post editing is disabled on this instance.'}, status=403)
+
+        if thread.author_id != request.user.pk:
+            return Response({'error': 'You can only edit your own threads.'}, status=403)
+
+        window = settings.post_edit_window_seconds
+        if window > 0:
+            age = (timezone.now() - thread.created_at).total_seconds()
+            if age > window:
+                return Response({'error': f'Edit window of {window} seconds has expired.'}, status=403)
+
+        new_body = request.data.get('body', '').strip()
+        if not new_body:
+            return Response({'error': 'Thread body cannot be empty.'}, status=400)
+
+        # Check hyperlinks — same rules apply on edit as on create
+        from rest_framework.exceptions import ValidationError as _VE
+        try:
+            _check_links_allowed(settings, thread.board, {'body': new_body})
+        except _VE as exc:
+            return Response(exc.detail, status=400)
+
+        thread.body = new_body
+        thread.edited_at = timezone.now()
+        thread.edit_count = (thread.edit_count or 0) + 1
+        thread.save(update_fields=['body', 'edited_at', 'edit_count'])
+
+        serializer = self.get_serializer(thread)
+        return Response(serializer.data)
+
 
 class PostViewSet(viewsets.ModelViewSet):
 
