@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import api from '../api/client'
 import ThreadCard from '../components/ThreadCard'
 import CatalogCard from '../components/CatalogCard'
@@ -11,6 +11,7 @@ import { Plus, RefreshCw, LayoutList, LayoutGrid, Search, X } from 'lucide-react
 
 export default function BoardDetail() {
   const { slug } = useParams()
+  const navigate = useNavigate()
   const { user, permissions } = useAuth()
   const { enable_nsfw_boards, block_nsfw_without_age_gate, allow_image_uploads, allow_video_uploads, allow_links: siteAllowLinks } = useSiteSettings()
   const [threads, setThreads] = useState([])
@@ -156,14 +157,14 @@ export default function BoardDetail() {
     if (imageFile) payload.append('image', imageFile)
     if (videoFile) payload.append('video', videoFile)
     try {
-      await api.post('/threads/', payload, {
+      const { data } = await api.post('/threads/', payload, {
         headers: { 'Content-Type': 'multipart/form-data' }
       })
       setForm({ title: '', body: '' })
       setImageFile(null); setImagePreview(null)
       setVideoFile(null); setVideoPreview(null)
       setShowForm(false)
-      fetchThreads()
+      navigate(`/thread/${data.id}`)
     } catch (err) {
       const data = err.response?.data
       const msg = data?.detail || data?.image || data?.video || data?.error ||

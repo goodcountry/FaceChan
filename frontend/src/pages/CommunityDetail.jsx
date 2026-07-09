@@ -125,7 +125,7 @@ export default function CommunityDetail() {
 
   const handlePost = async e => {
     e.preventDefault()
-    await api.post('/threads/', {
+    const { data } = await api.post('/threads/', {
       ...form,
       board: community.board_slug,
       community: slug,
@@ -135,7 +135,7 @@ export default function CommunityDetail() {
     setForm({ title: '', body: '' })
     setMcaptchaToken('')
     setShowForm(false)
-    fetchThreads()
+    navigate(`/thread/${data.id}`)
   }
 
   const handleAddMember = async e => {
