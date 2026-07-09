@@ -244,7 +244,7 @@ class BoardSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Board
-        fields = ['slug', 'name', 'description', 'icon', 'nsfw', 'allow_images', 'allow_videos', 'allow_video_sound', 'allow_links', 'thread_count']
+        fields = ['slug', 'name', 'description', 'icon', 'nsfw', 'allow_images', 'allow_videos', 'allow_video_sound', 'allow_links', 'markdown_enabled', 'thread_count']
 
     def get_thread_count(self, obj):
         return obj.threads.count()
@@ -408,6 +408,7 @@ class ThreadListSerializer(serializers.ModelSerializer):
     allow_videos = serializers.BooleanField(source='board.allow_videos', read_only=True)
     allow_video_sound = serializers.BooleanField(source='board.allow_video_sound', read_only=True)
     allow_links = serializers.BooleanField(source='board.allow_links', read_only=True)
+    markdown_enabled = serializers.BooleanField(source='board.markdown_enabled', read_only=True)
 
     class Meta:
         model = Thread
@@ -416,7 +417,7 @@ class ThreadListSerializer(serializers.ModelSerializer):
                   'video', 'video_thumbnail', 'video_duration',
                   'is_pinned', 'is_locked', 'is_hidden', 'comments_disabled', 'reply_count', 'view_count',
                   'reactions', 'reaction_count', 'last_reply_at', 'created_at',
-                  'allow_images', 'allow_videos', 'allow_video_sound', 'allow_links']
+                  'allow_images', 'allow_videos', 'allow_video_sound', 'allow_links', 'markdown_enabled']
 
     def get_reactions(self, obj):
         return get_reaction_summary(obj, self.context.get('request') and self.context['request'].user)

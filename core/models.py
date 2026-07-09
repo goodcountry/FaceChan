@@ -175,6 +175,23 @@ class User(AbstractUser):
         return self.is_banned or self.is_suspended
 
 
+def _default_markdown_enabled():
+    """
+    Default value for Board.markdown_enabled on newly created boards.
+
+    Mirrors the site-wide SiteSettings.allow_markdown flag at the moment a
+    board is created, so new boards inherit the instance-wide default.
+    Existing boards are unaffected, and this can be overridden per board
+    afterwards — it is a one-time default, not a live link between the two
+    settings. Falls back to False if SiteSettings hasn't been created yet
+    (e.g. fresh install, migrations running before the singleton exists).
+    """
+    try:
+        return bool(SiteSettings.get().allow_markdown)
+    except Exception:
+        return False
+
+
 class Board(models.Model):
     """4chan-style board e.g. /tech/, /cooking/"""
     slug = models.SlugField(unique=True, max_length=20)
@@ -190,6 +207,15 @@ class Board(models.Model):
         help_text='Allow users to post hyperlinks (http:// or https://) in thread titles, '
                   'thread bodies, and replies on this board. '
                   'Has no effect when the global "allow links" setting is disabled.'
+    )
+    markdown_enabled = models.BooleanField(
+        default=_default_markdown_enabled,
+        help_text='If enabled, posts on this board render full markdown '
+                  '(headers, lists, emphasis, code blocks, etc). '
+                  'If disabled, only greentext (">text") and line breaks '
+                  'are applied. New boards default to the site-wide '
+                  '"allow_markdown" setting at creation time; this can then '
+                  'be overridden per board. Admin-only setting.'
     )
     allow_federation = models.BooleanField(
         default=True,

@@ -71,8 +71,8 @@ class UserAdmin(BaseUserAdmin):
 
 @admin.register(Board)
 class BoardAdmin(admin.ModelAdmin):
-    list_display = ['slug', 'name', 'icon', 'nsfw', 'allow_images', 'thread_count', 'created_at']
-    list_editable = ['allow_images']
+    list_display = ['slug', 'name', 'icon', 'nsfw', 'allow_images', 'markdown_enabled', 'thread_count', 'created_at']
+    list_editable = ['allow_images', 'markdown_enabled']
     search_fields = ['slug', 'name']
     prepopulated_fields = {'slug': ('name',)}
 
