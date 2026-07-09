@@ -15,6 +15,8 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+html { scroll-behavior: smooth; }
+
 :root {
   --bg: #0d0d0f;
   --surface: #141418;
@@ -722,6 +724,31 @@ textarea { min-height: 100px; }
   padding-left: 20px; margin: 6px 0;
 }
 .markdown-body li { margin: 2px 0; }
+.markdown-body .greentext {
+  color: var(--green);
+  margin: 0 0 4px;
+}
+.markdown-body .quote-link {
+  color: var(--green);
+  text-decoration: none;
+  font-weight: 600;
+}
+.markdown-body .quote-link:hover {
+  text-decoration: underline;
+  opacity: 1;
+}
+
+/* ── Quote-link jump target highlight ────────────────────────────────────── */
+.fb-comment:target .fb-comment-bubble,
+.fb-reply:target .fb-reply-bubble {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  animation: quote-target-fade 2s ease-out;
+}
+@keyframes quote-target-fade {
+  from { background: var(--accent-dim); }
+  to { background: transparent; }
+}
 
 
 .fb-comment-footer {

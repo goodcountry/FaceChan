@@ -17,7 +17,7 @@ import VideoPlayer from '../components/VideoPlayer'
 import { MessageSquare, CornerDownRight, ChevronDown, ChevronUp, ArrowUp, Bell, BellOff, Pin, PinOff, MessageSquareOff, MessageSquareMore } from 'lucide-react'
 
 // ── Reply composer ────────────────────────────────────────────────────────────
-function ReplyComposer({ threadId, parentId, onPosted, onCancel, placeholder = 'Write a reply…', initialBody = '', showSage = false, allowImages = true, allowVideos = true, allowLinks = true }) {
+function ReplyComposer({ threadId, parentId, onPosted, onCancel, placeholder = 'Write a reply…', initialBody = '', showSage = false, allowImages = true, allowVideos = true, allowLinks = true, markdownEnabled = true }) {
   const [body, setBody] = useState(initialBody)
   const [sage, setSage] = useState(false)
   const [imageFile, setImageFile] = useState(null)
@@ -110,6 +110,11 @@ function ReplyComposer({ threadId, parentId, onPosted, onCancel, placeholder = '
           🔗 Hyperlinks (http/https) are not allowed on this board.
         </p>
       )}
+      <p className="form-hint muted" style={{ fontSize: '12px', margin: '2px 0 4px' }}>
+        {markdownEnabled
+          ? '✎ Markdown enabled — headers, lists, code blocks, **bold**, >>123 quote-links.'
+          : '✎ Greentext (>text) and >>123 quote-links only on this board.'}
+      </p>
       {imagePreview && (
         <div className="image-preview">
           <img src={imagePreview} alt="preview" />
@@ -167,7 +172,7 @@ function ReplyComposer({ threadId, parentId, onPosted, onCancel, placeholder = '
 }
 
 // ── Single reply (second level) ───────────────────────────────────────────────
-function Reply({ reply, threadId, onReact, onReplyToReply }) {
+function Reply({ reply, threadId, onReact, onReplyToReply, markdownEnabled }) {
   const { user } = useAuth()
 
   const handleReplyClick = () => {
@@ -175,7 +180,7 @@ function Reply({ reply, threadId, onReact, onReplyToReply }) {
   }
 
   return (
-    <div className="fb-reply">
+    <div className="fb-reply" id={`post-${reply.id}`}>
       <div className="fb-avatar fb-avatar-sm">
         {reply.author?.avatar
           ? <img src={reply.author.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
@@ -192,7 +197,7 @@ function Reply({ reply, threadId, onReact, onReplyToReply }) {
           <span className="fb-time">{timeAgo(reply.created_at)}</span>
           {reply.is_hidden && user && reply.author?.id === user.id && <HiddenBadge />}
         </div>
-        <MarkdownBody text={reply.body} />
+        <MarkdownBody text={reply.body} markdownEnabled={markdownEnabled} />
         <div className="fb-actions">
           <ReactionBar reactions={reply.reactions || []} onReact={emoji => onReact(reply.id, emoji)} />
           {user && (
@@ -208,7 +213,7 @@ function Reply({ reply, threadId, onReact, onReplyToReply }) {
 }
 
 // ── Top-level comment ─────────────────────────────────────────────────────────
-function Comment({ post, threadId, onReact, onNewReply, allowImages = true, allowVideos = true, allowVideoSound = true, allowLinks = true, commentsDisabled = false, isNew = false }) {
+function Comment({ post, threadId, onReact, onNewReply, allowImages = true, allowVideos = true, allowVideoSound = true, allowLinks = true, markdownEnabled = true, commentsDisabled = false, isNew = false }) {
   const { user } = useAuth()
   const { allow_post_editing, post_edit_window_seconds } = useSiteSettings()
   const [currentPost, setCurrentPost] = useState(post)
@@ -297,7 +302,7 @@ function Comment({ post, threadId, onReact, onNewReply, allowImages = true, allo
   }
 
   return (
-    <div className="fb-comment" ref={selfRef}>
+    <div className="fb-comment" ref={selfRef} id={currentPost.post_number ? `post-${currentPost.post_number}` : `post-${currentPost.id}`}>
       <div className="fb-avatar">
         {currentPost.author?.avatar
           ? <img src={currentPost.author.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
@@ -354,7 +359,7 @@ function Comment({ post, threadId, onReact, onNewReply, allowImages = true, allo
               </div>
             </div>
           ) : (
-            <MarkdownBody text={currentPost.body} />
+            <MarkdownBody text={currentPost.body} markdownEnabled={markdownEnabled} />
           )}
         </div>
 
@@ -388,6 +393,7 @@ function Comment({ post, threadId, onReact, onNewReply, allowImages = true, allo
                 threadId={threadId}
                 onReact={onReact}
                 onReplyToReply={handleReplyToReply}
+                markdownEnabled={markdownEnabled}
               />
             ))}
           </div>
@@ -405,6 +411,7 @@ function Comment({ post, threadId, onReact, onNewReply, allowImages = true, allo
             allowVideos={allowVideos}
             allowVideoSound={allowVideoSound}
             allowLinks={allowLinks}
+            markdownEnabled={markdownEnabled}
           />
         )}
       </div>
@@ -557,7 +564,7 @@ export default function ThreadDetail() {
             soundAllowed={thread.allow_video_sound !== false}
           />
         )}
-        <MarkdownBody text={thread.body} className="fb-body markdown-body thread-op-body" />
+        <MarkdownBody text={thread.body} className="fb-body markdown-body thread-op-body" markdownEnabled={thread.markdown_enabled} />
         <div className="thread-op-footer">
           <ReactionBar reactions={thread.reactions || []} onReact={handleThreadReact} />
           <span className="thread-stats-inline">
@@ -604,6 +611,7 @@ export default function ThreadDetail() {
           allowImages={thread.allow_images !== false && (allow_image_uploads || !!user?.can_post_media)}
           allowVideos={thread.allow_videos !== false && (allow_video_uploads || !!user?.can_post_media)}
           allowLinks={!!(siteAllowLinks && thread.allow_links)}
+          markdownEnabled={!!thread.markdown_enabled}
         />
       )}
       {thread.comments_disabled && <p className="muted text-center">💬 Comments are disabled on this thread.</p>}
@@ -624,6 +632,7 @@ export default function ThreadDetail() {
             allowVideos={thread.allow_videos !== false && (allow_video_uploads || !!user?.can_post_media)}
             allowVideoSound={thread.allow_video_sound !== false}
             allowLinks={!!(siteAllowLinks && thread.allow_links)}
+            markdownEnabled={!!thread.markdown_enabled}
             commentsDisabled={!!thread.comments_disabled}
             isNew={p.id === newPostId}
           />
