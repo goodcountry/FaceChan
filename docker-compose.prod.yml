@@ -176,40 +176,21 @@ services:
   tor-proxy:
     image: peterdavehello/tor-socks-proxy:latest
     restart: always
-    # Override the image's built-in healthcheck. History of getting this
-    # wrong, in order, worth keeping so it isn't repeated:
-    #  1. Image's own default: curl --fail against Facebook's onion.
-    #     A real HTTP/2 500 FROM Facebook's own servers (confirmed by
-    #     hand — legitimate Meta debug headers came back) still counts
-    #     as failure under --fail, even though the proxy reached them
-    #     fine. Wrong target to be picky about status code with.
-    #  2. Tried check.torproject.org/api/ip instead — has its own
-    #     documented history of intermittent breakage (Tor Project
-    #     forum, Jan 2024), so this just traded one flaky external
-    #     dependency for another.
-    #  3. Tried a pure local port probe via `curl telnet://localhost:9150`.
-    #     Wrong tool: --connect-timeout only bounds the TCP connect
-    #     phase — once connected, curl's telnet client sits waiting for
-    #     a server banner that a SOCKS5 port never sends, so it just
-    #     hangs until Docker's own healthcheck timeout kills it. Passed
-    #     in a quick sandbox test only because that test's dummy
-    #     listener closed the connection immediately after accept,
-    #     which isn't how a real, working SOCKS port behaves.
-    #  4. Tried `nc -z` (the textbook right tool for a zero-I/O port
-    #     probe) — this build's nc didn't behave as expected against a
-    #     working Tor SocksPort either.
-    # Landed on: same real request as (1), same target, just without
-    # --fail. curl's own exit code already reflects genuine transport
-    # success/failure regardless of HTTP status — 0 whenever a response
-    # (any status) comes back, 7/28/etc. only on a real connection
-    # failure. Verified directly against a local server returning 500:
-    # exit 0 without --fail, exit 22 with it.
+    # Three attempts at replacing the image's built-in healthcheck (curl
+    # --fail against Facebook's onion, check.torproject.org/api/ip,
+    # curl telnet:// as a local port probe, nc -z, a raw SOCKS5
+    # handshake byte-check) each failed differently once actually tested
+    # against a real running instance — some against external targets
+    # that turned out to be individually flaky per-request regardless of
+    # proxy health, some against this specific minimal image's tool
+    # behavior not matching docs/expectations. Rather than keep guessing
+    # at synthetic checks that can't be verified without live access to
+    # the box this runs on, disabled entirely — matching the 'tor'
+    # container above, which has never had one and just shows plain Up.
+    # Real federation traffic (Follow/Accept/Create actually delivering)
+    # is the proof this container works, not a container healthcheck.
     healthcheck:
-      test: ["CMD-SHELL", "curl -s -o /dev/null --connect-timeout 10 --socks5-hostname localhost:9150 'https://www.facebookwkhpilnemxj7asaniu7vnjjbiltxjqhye3mhbshg7kx5tfyd.onion/' || exit 1"]
-      interval: 30s
-      timeout: 15s
-      retries: 5
-      start_period: 60s
+      disable: true
     networks:
       - internal
 
