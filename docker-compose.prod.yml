@@ -176,6 +176,21 @@ services:
   tor-proxy:
     image: peterdavehello/tor-socks-proxy:latest
     restart: always
+    # Override the image's built-in healthcheck, which curls Facebook's
+    # onion specifically — a 500 from Facebook's own servers (rate
+    # limiting, anything on their end) marks this container unhealthy
+    # even though Tor itself is working perfectly. Checking against any
+    # external site — including Tor Project's own check.torproject.org/
+    # api/ip, which has its own history of intermittent breakage — ties
+    # our health status to a third party's uptime. What we actually care
+    # about is whether our own SOCKS5 listener is up; real federation
+    # traffic is the proof that full Tor connectivity works end to end.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s --connect-timeout 5 telnet://localhost:9150 </dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     networks:
       - internal
 
