@@ -236,6 +236,44 @@ def handle_create_reply(activity, obj, remote_instance, log_entry):
     log_entry.save(update_fields=["status"])
     logger.info("Created remote reply %s in thread %s", post.pk, thread.pk)
 
+    # Bump reply_count. Unlike last_reply_at (handled by the core.Post
+    # post_save signal, which fires regardless of creation path),
+    # reply_count is only ever incremented directly inside core/views.py's
+    # reply-creation code — never via a signal. Federated replies go
+    # through Post.objects.create() here instead, bypassing that entirely.
+    # Without this, federated replies silently never count towards unread
+    # totals: not just a missing WebSocket push, but broken even for the
+    # 60s polling fallback, since that reads this same field.
+    from django.db.models import F
+    Thread.objects.filter(pk=thread.pk).update(reply_count=F('reply_count') + 1)
+
+    # Fan out to watchers — same shape as PostViewSet.perform_create's
+    # equivalent block for same-site replies, so federated replies show
+    # up in the feed and push a live bell update too, not just a silent
+    # reply_count bump.
+    from core.models import WatchedThread, FeedItem
+    watchers = WatchedThread.objects.filter(thread=thread).select_related('user')
+    if remote_author is not None:
+        watchers = watchers.exclude(user=remote_author)
+    FeedItem.objects.bulk_create([
+        FeedItem(user=w.user, thread=thread, post=post, reason='thread_reply')
+        for w in watchers
+    ], ignore_conflicts=True)
+
+    channel_layer = get_channel_layer()
+    if channel_layer is not None:
+        for w in watchers:
+            async_to_sync(channel_layer.group_send)(
+                f"notifications_{w.user.id}",
+                {
+                    "type": "send.notification",
+                    "unread": w.unread_count,
+                    "thread_id": str(thread.id),
+                    "thread_title": thread.title,
+                    "post_id": str(post.id),
+                }
+            )
+
 
 def _resolve_parent_thread(in_reply_to):
     """
