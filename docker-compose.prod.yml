@@ -43,7 +43,7 @@ services:
       MEDIA_ROOT: /app/media
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/1}
       FEDERATION_BASE_URL: ${FEDERATION_BASE_URL:-}
-      FEDERATION_SOCKS_PROXY: ${FEDERATION_SOCKS_PROXY:-socks5h://tor-proxy:9050}
+      FEDERATION_SOCKS_PROXY: ${FEDERATION_SOCKS_PROXY:-socks5h://tor-proxy:9150}
     depends_on:
       db:
         condition: service_healthy
@@ -72,7 +72,7 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
       FEDERATION_BASE_URL: ${FEDERATION_BASE_URL:-}
-      FEDERATION_SOCKS_PROXY: ${FEDERATION_SOCKS_PROXY:-socks5h://tor-proxy:9050}
+      FEDERATION_SOCKS_PROXY: ${FEDERATION_SOCKS_PROXY:-socks5h://tor-proxy:9150}
     depends_on:
       db:
         condition: service_healthy
@@ -95,7 +95,7 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
       FEDERATION_BASE_URL: ${FEDERATION_BASE_URL:-}
-      FEDERATION_SOCKS_PROXY: ${FEDERATION_SOCKS_PROXY:-socks5h://tor-proxy:9050}
+      FEDERATION_SOCKS_PROXY: ${FEDERATION_SOCKS_PROXY:-socks5h://tor-proxy:9150}
     depends_on:
       db:
         condition: service_healthy
@@ -162,18 +162,20 @@ services:
   # Dedicated OUTBOUND Tor SOCKS proxy for delivering to .onion instances.
   # Separate from the inbound hidden-service 'tor' container above.
   #
-  # Volumes persist Tor's own state (consensus, guard relays, etc.) across
-  # restarts. Without these, every restart forces a full from-scratch
-  # bootstrap — refetching the network consensus and picking new guards —
-  # which is slow and prone to getting stuck ("Stuck at 30%: Loading
-  # networkstatus consensus") especially on a flaky connection. With them,
-  # restarts come back up much faster and more reliably.
+  # Uses peterdavehello/tor-socks-proxy, not dperson/torproxy. The latter
+  # was found running a multi-year-stale Tor binary (0.4.3.5) with a long,
+  # still-open history of getting permanently stuck at "Bootstrapped 30%:
+  # Loading networkstatus consensus" (see github.com/dperson/torproxy
+  # issues #35, #47, #87) — this is a known bug in that image, not a
+  # network/VPN/ISP problem, confirmed by direct comparison against the
+  # 'tor' container above (much newer Tor version, bootstraps in seconds).
+  # peterdavehello/tor-socks-proxy is actively maintained via Renovate
+  # (automated Tor version bumps) and is SOCKS5-only, which is all
+  # FEDERATION_SOCKS_PROXY actually needs — no bundled Privoxy/HTTP layer.
+  # Listens on 9150, not 9050 — see FEDERATION_SOCKS_PROXY below.
   tor-proxy:
-    image: dperson/torproxy:latest
+    image: peterdavehello/tor-socks-proxy:latest
     restart: always
-    volumes:
-      - tor_proxy_var:/var/lib/tor
-      - tor_proxy_etc:/etc/tor
     networks:
       - internal
 
@@ -186,5 +188,3 @@ volumes:
   media_data:
   static_data:
   tor_keys:    # Persists your .onion key — back this up!
-  tor_proxy_var:
-  tor_proxy_etc:

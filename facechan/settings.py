@@ -131,8 +131,8 @@ FEDERATION_BASE_URL = config("FEDERATION_BASE_URL", default="http://localhost:80
 # destinations ignore this and connect directly. The socks5h:// scheme makes
 # Tor resolve DNS (required for .onion). Empty string disables onion outbound
 # (onion deliveries/fetches will fail loudly rather than hang).
-# Set in .env: FEDERATION_SOCKS_PROXY=socks5h://tor-proxy:9050
-FEDERATION_SOCKS_PROXY = config("FEDERATION_SOCKS_PROXY", default="socks5h://tor-proxy:9050")
+# Set in .env: FEDERATION_SOCKS_PROXY=socks5h://tor-proxy:9150 (peterdavehello/tor-socks-proxy default port)
+FEDERATION_SOCKS_PROXY = config("FEDERATION_SOCKS_PROXY", default="socks5h://tor-proxy:9150")
 
 # ── mCaptcha (optional) ───────────────────────────────────────────────────────
 # Self-hosted proof-of-work captcha. Set both vars to enable.

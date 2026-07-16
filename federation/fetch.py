@@ -47,7 +47,7 @@ def _socks_proxy():
     """
     Return the configured Tor SOCKS proxy URL, or None if unset/empty.
 
-    Defaults to socks5h://tor-proxy:9050 (the dedicated outbound Tor
+    Defaults to socks5h://tor-proxy:9150 (the dedicated outbound Tor
     container on the internal Docker network). Override via the
     FEDERATION_SOCKS_PROXY env var / Django setting.
     """

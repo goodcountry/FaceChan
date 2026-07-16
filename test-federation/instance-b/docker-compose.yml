@@ -51,7 +51,7 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-facechan_b}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-facechan_b}
       REDIS_URL: redis://redis:6379/1
       CELERY_BROKER_URL: redis://redis:6379/0
-      FEDERATION_SOCKS_PROXY: socks5h://tor-proxy:9050
+      FEDERATION_SOCKS_PROXY: socks5h://tor-proxy:9150
     depends_on:
       db:
         condition: service_healthy
@@ -78,7 +78,7 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-facechan_b}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-facechan_b}
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
-      FEDERATION_SOCKS_PROXY: socks5h://tor-proxy:9050
+      FEDERATION_SOCKS_PROXY: socks5h://tor-proxy:9150
     depends_on:
       db:
         condition: service_healthy
@@ -99,7 +99,7 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-facechan_b}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-facechan_b}
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
-      FEDERATION_SOCKS_PROXY: socks5h://tor-proxy:9050
+      FEDERATION_SOCKS_PROXY: socks5h://tor-proxy:9150
     depends_on:
       db:
         condition: service_healthy
@@ -150,7 +150,7 @@ services:
   # port on the internal network so web/celery can reach .onion
   # instances. It does not publish a hidden service.
   tor-proxy:
-    image: dperson/torproxy:latest
+    image: peterdavehello/tor-socks-proxy:latest
     restart: always
     networks:
       - internal
