@@ -324,9 +324,16 @@ class BoardInboxView(View):
                 # Mark the matching RemoteBoardMapping as accepted so the
                 # dashboard can show follow status.
                 accepted_obj = activity.get('object', {})
-                # object.object is our local board actor URL
+                # The inner Follow object, as built by build_accept_activity on
+                # the remote side, is {'actor': <our ap_id, echoed back>,
+                # 'object': <their own ap_id>}. We need 'actor' here to get
+                # back to one of OUR local Actors — 'object' is THEIRS, and
+                # will never match anything in our own Actor table (this was
+                # the bug: using .get('object') here meant the lookup below
+                # could never match, silently, with no exception raised and
+                # no error logged — follow_accepted stayed False forever).
                 local_actor_url = (
-                    accepted_obj.get('object') if isinstance(accepted_obj, dict)
+                    accepted_obj.get('actor') if isinstance(accepted_obj, dict)
                     else accepted_obj
                 )
                 try:
