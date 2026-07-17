@@ -142,7 +142,7 @@ If no directory exists yet, the FaceChan GitHub repository is the natural place 
 
 FaceChan's federation transport layer (`federation/fetch.py`) routes outbound requests based on the destination address:
 
-- Requests to `.onion` addresses go via `socks5h://tor-proxy:9050`
+- Requests to `.onion` addresses go via `socks5h://tor-proxy:9150`
 - Requests to clearnet addresses go direct
 
 This means mixed-mode federation is *theoretically* possible, but both sides need to be configured correctly.
@@ -150,7 +150,7 @@ This means mixed-mode federation is *theoretically* possible, but both sides nee
 **What a clearnet instance needs to reach an onion instance:**
 
 1. The `tor-proxy` container must be running (it's in the prod compose file — don't remove it)
-2. `FEDERATION_SOCKS_PROXY=socks5h://tor-proxy:9050` must be set in `.env`
+2. `FEDERATION_SOCKS_PROXY=socks5h://tor-proxy:9150` must be set in `.env`
 3. That's it for outbound delivery — requests to `.onion` addresses will route through Tor automatically
 
 **What an onion instance needs to reach a clearnet instance:**
@@ -198,6 +198,8 @@ So for *inbound* activities from onion instances to work on a clearnet instance,
 ## Making your instance discoverable
 
 Once your .onion is running, people can only find it if they know the address. This section covers how to get listed on dark web search engines and directories — and how to do it without exposing yourself.
+
+**Always publish your address with an explicit `http://` prefix.** Onion services typically serve plain HTTP on port 80 — nothing listens on 443. Some browsers (notably Tor Browser on Android) silently attempt an HTTPS upgrade on pasted or schemeless addresses even with HTTPS-Only mode off, which fails against an http-only onion with a generic "Unable to connect" and no fallback. Write it as `http://youraddress.onion` everywhere, never as a bare hostname.
 
 ### How dark web crawlers work
 

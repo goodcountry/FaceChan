@@ -26,7 +26,7 @@ Open a pull request adding a row to the table above. Copy the template below, fi
 
 **Field guide:**
 
-- **URL** — your `FEDERATION_BASE_URL`. Clearnet domain or `.onion` address.
+- **URL** — your `FEDERATION_BASE_URL`. Clearnet domain or `.onion` address. Onion entries must include the explicit `http://` prefix (e.g. `http://youraddress.onion`) — some browsers, including Tor Browser on Android, silently upgrade schemeless addresses to HTTPS, which fails against http-only onion services.
 - **Type** — `Clearnet`, `Onion`, or `Dual-stack`
 - **Content policy** — a short honest description. Examples:
   - `General, SFW only`

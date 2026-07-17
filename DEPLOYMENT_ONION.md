@@ -265,7 +265,7 @@ For your instance to deliver activities to other `.onion` instances, outbound HT
 
 ```
 # Already set to the bundled tor-proxy container by default:
-FEDERATION_SOCKS_PROXY=socks5h://tor-proxy:9050
+FEDERATION_SOCKS_PROXY=socks5h://tor-proxy:9150
 ```
 
 Only `.onion` destinations are routed through Tor. Clearnet federation connects directly. Set `FEDERATION_SOCKS_PROXY` to an empty string to disable onion outbound entirely.
@@ -305,6 +305,12 @@ Your `.onion` address is generated from a private key stored on disk. Lose or de
 ## Making your instance discoverable
 
 Once your .onion is running, people can only find it if they know the address. This section covers how to get listed on dark web search engines and directories — and how to do it without exposing yourself.
+
+### Always publish your address with an explicit `http://` prefix
+
+Onion services typically serve plain HTTP on port 80 (FaceChan's default) — there is nothing listening on 443. Some browsers, notably Tor Browser on Android, silently attempt an HTTPS upgrade on pasted or schemeless addresses even with HTTPS-Only mode disabled. Against an http-only onion this fails with a generic "Unable to connect" — no fallback, no hint that the scheme was rewritten, and the `https://` prefix is scrolled off-screen in a mobile address bar. Visitors will conclude your site is down.
+
+Wherever you publish the address — directories, forum posts, READMEs, chat messages — write it as `http://youraddress.onion`, never as a bare hostname. Bookmarking the site inside Tor Browser after a successful load also preserves the scheme.
 
 ### How dark web crawlers work
 
