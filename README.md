@@ -247,7 +247,9 @@ FaceChan/
 ├── DEPLOYMENT_FEDERATION.md # ActivityPub federation guide (all deployment types)
 ├── DEPLOYMENT_ONION.md    # Tor hidden service deployment & security guide
 ├── DONATE.md
-└── ROADMAP.md
+├── ROADMAP.md
+├── SECURITY.md            # Vulnerability reporting, incl. anonymous routes
+└── pgp.asc                # Kino's PGP public key
 ```
 
 ---
@@ -431,6 +433,10 @@ git remote add upstream https://github.com/goodcountry/FaceChan.git
 ```
 
 That's it. You now have your own version and a line back to the source.
+
+## Security
+
+Found a vulnerability? See [SECURITY.md](./SECURITY.md) — including how to report anonymously. PGP key in [`pgp.asc`](./pgp.asc).
 
 ## Contributing
 
